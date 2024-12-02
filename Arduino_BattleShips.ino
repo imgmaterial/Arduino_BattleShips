@@ -8,6 +8,8 @@ int joy_y = A0;
 
 int grid_x = 0;
 int grid_y = 0;
+
+bool button_pressed =false;
 typedef enum{
   Up = 0,
   Down = 1,
@@ -43,9 +45,9 @@ void intializeShips(){
   battleship_grid[0][1] = 1;
   battleship_grid[2][0] = 1;
   battleship_grid[3][0] = 1;
-  battleship_grid[4][0] = 1;
   battleship_grid[4][1] = 1;
   battleship_grid[4][2] = 1;
+  battleship_grid[4][3] = 1;
 }
 
 void draw_grid(){
@@ -75,13 +77,13 @@ void draw_zeros(){
     for (int j = 0;j < 5;j++){
       switch (battleship_grid[i][j]){
         case (1):
-          u8g2.drawCircle(start_x + radius + i*offset, start_y + radius + j*offset, 8);
+          drawShade(start_x+i*offset, start_y+j*offset, 20, 20);
           break;
         case (2):
           drawCross(start_x+i*offset, start_y+j*offset, 20, 20);
           break;
         case (3):
-          drawShade(start_x+i*offset, start_y+j*offset, 20, 20);
+          u8g2.drawCircle(start_x + radius + i*offset, start_y + radius + j*offset, 8);
           break;
       }
     }
@@ -108,8 +110,18 @@ void readJoy(){
     processJoyInput(Up);
   }
   else if(pos_y > 900){
-    Serial.println("Click");
+    if (!button_pressed){
+      button_pressed = true;
+      if (battleship_grid[grid_x][grid_y] == 1 || battleship_grid[grid_x][grid_y] == 2){
+        battleship_grid[grid_x][grid_y] = 2; 
+      }
+      else{
+        battleship_grid[grid_x][grid_y] = 3;
+      }
+    }
+    return;
   }
+  button_pressed = false;
 }
 
 void processJoyInput(JoyPos input){
