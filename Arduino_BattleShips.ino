@@ -47,7 +47,6 @@ void setup(void) {
   u8g2.begin();
   intializeShips();
   previouse_millis = millis();
-  send_client_registration();
 }
 
 void loop(void) {
@@ -305,19 +304,7 @@ void client_setup()
   client.onEvent(onEventsCallback);
   
   // try to connect to Websockets server
-  connected = client.connect(websockets_server_host, websockets_server_port, "/");
-  
-  if (connected) 
-  {
-    Serial.println("Connected!");
-    
-    String WS_msg = String("Hello to Server from ") + BOARD_NAME;
-    client.send(WS_msg);
-  } 
-  else 
-  {
-    Serial.println("Not Connected!");
-  }
+  reconnect_to_server();
 }
 
 void reconnect_to_server(){
@@ -327,8 +314,7 @@ void reconnect_to_server(){
     {
       Serial.println("Connected!");
     
-      String WS_msg = String("Hello to Server from ") + BOARD_NAME;
-      client.send(WS_msg);
+      send_client_registration();
     } 
     else 
     {
@@ -338,6 +324,6 @@ void reconnect_to_server(){
 }
 
 void send_client_registration(){
-  String msg = "REGISTER: " + String(device_identifier);
+  String msg = "REGISTER:" + String(device_identifier);
   client.send(msg);
 }
