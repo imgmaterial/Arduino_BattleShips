@@ -74,20 +74,22 @@ void read_button(){
   else{
     if (!button_pressed){
       attack_grid_point(enemy_grid);
-      send_grid();
     }
     button_pressed = true;
   }
 }
 
 void attack_grid_point(int (*grid)[5]){
-  if (grid[grid_x][grid_y] == 1 || grid[grid_x][grid_y] == 2){
-    grid[grid_x][grid_y] = 2; 
-  }
-  else{
-    grid[grid_x][grid_y] = 3;
-    your_turn = false;
-  }
+  send_attack(grid_x, grid_y);
+  // if (grid[grid_x][grid_y] == 1 || grid[grid_x][grid_y] == 2){
+  //   //grid[grid_x][grid_y] = 2;
+  //   send_attack(grid_x, grid_y); 
+  // }
+  // else{
+  //   //grid[grid_x][grid_y] = 3;
+  //   send_attack(grid_x, grid_y); 
+  //   //your_turn = false;
+  // }true fals
 }
 
 void render_current_grid(){
@@ -298,7 +300,8 @@ void client_setup()
   client.onMessage([&](WebsocketsMessage message) 
   {
     Serial.print("Got Message: ");
-    Serial.println(message.data());
+    //Serial.println(message.data());
+    parse_message(message.data());
   });
 
   // run callback when events are occuring
@@ -307,6 +310,15 @@ void client_setup()
   // try to connect to Websockets server
   reconnect_to_server();
 }
+
+void parse_message(String message){
+  Serial.println(message);
+  if (message.startsWith("ATTACKRESULT")){
+    //12 15 17
+    enemy_grid[String(message[13]).toInt()][String(message[15]).toInt()] = String(message[17]).toInt();
+  }
+}
+
 
 void reconnect_to_server(){
   if (!connected){
@@ -336,7 +348,7 @@ void send_grid(){
 }
 
 void send_attack(int x, int y){
-  String msg = "ATTACK:" + String(x) + ":" + String(y);
+  String msg = "ATTACK:" + String(device_identifier) +":"+ String(x) + ":" + String(y);
   client.send(msg);
 }
 
