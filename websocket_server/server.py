@@ -4,24 +4,14 @@ from websockets.asyncio.server import serve
 connected = set()
 
 async def handler(websocket):
-    # Register.
-    connected.add(websocket)
     async for message in websocket:
-        print(connected)
+        print(message)
         await websocket.send(message)
-    try:
-        for socket in connected:
-            await socket.send("Hello")
-        await asyncio.sleep(10)
-        print(connected)
-    finally:
-        connected.remove(websocket)
-        print(connected)
     
 
 
 async def main():
-    async with serve(handler, "10.81.0.23", 8080) as server:
+    async with serve(handler, "192.168.1.150", 5000) as server:
         await server.serve_forever()
 
 
