@@ -42,10 +42,10 @@ unsigned long previouse_millis;
 U8G2_SH1107_SEEED_128X128_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
 void setup(void) {
-  client_setup();
   pinMode(button_pin, INPUT);
   u8g2.begin();
   intializeShips();
+  client_setup();
   previouse_millis = millis();
 }
 
@@ -74,6 +74,7 @@ void read_button(){
   else{
     if (!button_pressed){
       attack_grid_point(enemy_grid);
+      send_grid();
     }
     button_pressed = true;
   }
@@ -315,6 +316,7 @@ void reconnect_to_server(){
       Serial.println("Connected!");
     
       send_client_registration();
+      send_grid();
     } 
     else 
     {
@@ -326,4 +328,26 @@ void reconnect_to_server(){
 void send_client_registration(){
   String msg = "REGISTER:" + String(device_identifier);
   client.send(msg);
+}
+
+void send_grid(){
+  String msg = "GRID:" + grid_to_string(battleship_grid);
+  client.send(msg);
+}
+
+String grid_to_string(int grid[5][5]){
+  String grid_str = String("");
+  for (int i = 0; i<5;i++){
+    for (int j = 0; j<5;j++){
+      grid_str = grid_str + String(grid[j][i]);
+      if (j != 4){
+        grid_str = grid_str + String(",");
+      }
+    }
+    if (i != 4){
+        grid_str = grid_str + ";";
+    }
+  }
+  Serial.println(grid_str);
+  return grid_str;
 }

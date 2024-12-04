@@ -3,7 +3,7 @@ from websockets.asyncio.server import serve
 from player import Player
 
 players = set()
-
+grid = []
 async def handler(websocket):
     async for message in websocket:
         print(message)
@@ -38,6 +38,9 @@ async def parse_message(websocket,message):
         case "REGISTER":
             register_player(websocket, split[1])
             await websocket.send(str(websocket.id) + " registered as " + split[1])
+        case "GRID":
+            grid = [list(map(int, x.split(","))) for x in split[1].split(";")]
+            await websocket.send("Recieved grid")
         case _:
             await websocket.send("Unknown command")
 
