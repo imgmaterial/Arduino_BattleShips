@@ -30,7 +30,12 @@ async def broadcast_to_registered(message):
     for player in players:
         player.websocket.send(message)
 
-
+def attack_point(x,y):
+    if grid[y][x] == 1:
+        return 2
+    elif grid[y][x] == 0:
+        return 3
+    print(grid)
 
 async def parse_message(websocket,message):
     split = message.split(":")
@@ -41,6 +46,9 @@ async def parse_message(websocket,message):
         case "GRID":
             grid = [list(map(int, x.split(","))) for x in split[1].split(";")]
             await websocket.send("Recieved grid")
+        case "ATTACK":
+            result = attack_point(split[2],split[3])
+            await websocket.send(f"ATTACKRESULT:{split[2]}:{split[3]}:{result}")
         case _:
             await websocket.send("Unknown command")
 

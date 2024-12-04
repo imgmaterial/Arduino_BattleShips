@@ -331,7 +331,12 @@ void send_client_registration(){
 }
 
 void send_grid(){
-  String msg = "GRID:" + grid_to_string(battleship_grid);
+  String msg = "GRID:" + grid_to_string(enemy_grid);
+  client.send(msg);
+}
+
+void send_attack(int x, int y){
+  String msg = "ATTACK:" + String(x) + ":" + String(y);
   client.send(msg);
 }
 
