@@ -3,6 +3,7 @@ from websockets.asyncio.server import serve
 from player import Player
 
 players = set()
+turns = [True, False]
 grid = []
 async def handler(websocket):
     async for message in websocket:
@@ -22,6 +23,8 @@ def register_player(websocket_id, player_name):
     for player in players:
         if player.id == player_name:
             players.remove(player)
+    if len(players) > 1:
+        return
     players.add(new_player)
     print(players)
 
@@ -30,13 +33,24 @@ async def broadcast_to_registered(message):
     for player in players:
         player.websocket.send(message)
 
+async def change_turns():
+    global turns
+    if turns == [True, False]:
+        turns = [False, True]
+    elif turns == [False, True]:
+        turns = [True, False]
+    for i in range(len(players)):
+        msg = f"TURN:{turns[i]}"
+        await list(players)[i].websocket.send(msg)
+
 def attack_point(x,y):
-    print(grid)
     if grid[y][x] == 1 or grid[y][x] == 2:
         grid[y][x] = 2
+        print(grid)
         return 2
     elif grid[y][x] == 0 or grid[y][x] == 3:
         grid[y][x] = 3
+        print(grid)
         return 3
 
 async def parse_message(websocket,message):
@@ -53,6 +67,8 @@ async def parse_message(websocket,message):
             print(split)
             result = attack_point(int(split[2]),int(split[3]))
             await websocket.send(f"ATTACKRESULT:{split[2]}:{split[3]}:{result}")
+            if result == 3:
+                await change_turns()
         case _:
             await websocket.send("Unknown command")
 

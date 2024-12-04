@@ -317,6 +317,14 @@ void parse_message(String message){
     //12 15 17
     enemy_grid[String(message[13]).toInt()][String(message[15]).toInt()] = String(message[17]).toInt();
   }
+  else if(message.startsWith("TURN")){
+    if (message.endsWith("True")){
+      your_turn = true;
+    }
+    else if (message.endsWith("False")){
+      your_turn = false;
+    }
+  }
 }
 
 
