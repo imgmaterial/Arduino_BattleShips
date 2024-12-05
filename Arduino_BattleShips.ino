@@ -52,11 +52,6 @@ void setup(void) {
 }
 
 void loop(void) {
-  reconnect_to_server();
-  if (client.available()) 
-  {
-    client.poll();
-  }
   if (game_started){
     u8g2.clearBuffer();
     readJoy();
@@ -71,6 +66,11 @@ void loop(void) {
     u8g2.setFont(u8g2_font_ncenB14_tf);
     render_connecting();
     u8g2.sendBuffer();
+  }
+  reconnect_to_server();
+  if (client.available()) 
+  {
+    client.poll();
   }
 }
 
@@ -371,7 +371,7 @@ void send_client_registration(){
 }
 
 void send_grid(){
-  String msg = "GRID:"+ grid_to_string(enemy_grid)+ ":" +String(device_identifier);
+  String msg = "GRID:"+ grid_to_string(battleship_grid)+ ":" +String(device_identifier);
   client.send(msg);
 }
 
