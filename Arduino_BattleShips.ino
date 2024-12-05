@@ -23,6 +23,8 @@ int joy_y = A0;
 int grid_x = 0;
 int grid_y = 0;
 
+
+bool game_started = false;
 bool your_turn = true;
 bool button_pressed =false;
 typedef enum{
@@ -55,15 +57,34 @@ void loop(void) {
   {
     client.poll();
   }
-  u8g2.clearBuffer();
-  readJoy();
-  read_button();
-  draw_grid();
-  draw_cursor(grid_x,grid_y);
-  render_current_grid();
-  u8g2.sendBuffer();
+  if (game_started){
+    u8g2.clearBuffer();
+    readJoy();
+    read_button();
+    draw_grid();
+    draw_cursor(grid_x,grid_y);
+    render_current_grid();
+    u8g2.sendBuffer();
+  }
+  else{
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_ncenB14_tf);
+    render_connecting();
+    u8g2.sendBuffer();
+  }
 }
 
+void render_connecting(){
+  Serial.println("Screen Connecting");
+  if (connected){
+    u8g2.drawStr(12, 64, "Connected");
+    u8g2.drawStr(12, 84, "Waiting for");
+    u8g2.drawStr(12, 104, "game start");
+  }
+  else{
+    u8g2.drawStr(12, 64, "Connecting");
+  }
+}
 
 void read_button(){
   PinStatus button = digitalRead(button_pin);
@@ -109,14 +130,6 @@ void intializeShips(){
   battleship_grid[4][1] = 1;
   battleship_grid[4][2] = 1;
   battleship_grid[4][3] = 1;
-
-  enemy_grid[0][0] = 1;
-  enemy_grid[0][1] = 1;
-  enemy_grid[2][0] = 1;
-  enemy_grid[3][0] = 1;
-  enemy_grid[4][1] = 1;
-  enemy_grid[4][2] = 1;
-  enemy_grid[4][3] = 1;
 }
 
 void draw_grid(){
@@ -325,6 +338,13 @@ void parse_message(String message){
       your_turn = false;
     }
   }
+  else if (message.startsWith("GAMESTART")){
+    game_started = true;
+  }
+  else if (message.startsWith("DEFENCE")){
+    //DEFENCE:3:3:3
+    battleship_grid[String(message[8]).toInt()][String(message[10]).toInt()] = String(message[12]).toInt();
+  }
 }
 
 
@@ -351,7 +371,7 @@ void send_client_registration(){
 }
 
 void send_grid(){
-  String msg = "GRID:" + grid_to_string(enemy_grid);
+  String msg = "GRID:"+ grid_to_string(enemy_grid)+ ":" +String(device_identifier);
   client.send(msg);
 }
 
