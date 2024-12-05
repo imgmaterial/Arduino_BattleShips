@@ -102,15 +102,6 @@ void read_button(){
 
 void attack_grid_point(int (*grid)[5]){
   send_attack(grid_x, grid_y);
-  // if (grid[grid_x][grid_y] == 1 || grid[grid_x][grid_y] == 2){
-  //   //grid[grid_x][grid_y] = 2;
-  //   send_attack(grid_x, grid_y); 
-  // }
-  // else{
-  //   //grid[grid_x][grid_y] = 3;
-  //   send_attack(grid_x, grid_y); 
-  //   //your_turn = false;
-  // }true fals
 }
 
 void render_current_grid(){
@@ -384,7 +375,7 @@ String grid_to_string(int grid[5][5]){
   String grid_str = String("");
   for (int i = 0; i<5;i++){
     for (int j = 0; j<5;j++){
-      grid_str = grid_str + String(grid[j][i]);
+      grid_str = grid_str + String(grid[i][j]);
       if (j != 4){
         grid_str = grid_str + String(",");
       }
