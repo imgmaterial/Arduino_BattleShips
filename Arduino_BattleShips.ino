@@ -23,10 +23,30 @@ int joy_y = A0;
 int grid_x = 0;
 int grid_y = 0;
 
-
-bool game_started = false;
 bool your_turn = true;
 bool button_pressed =false;
+
+typedef enum{
+  Vertical = 0,
+  Horizontal = 1,
+}Orientation;
+
+typedef struct{
+  int size;
+  Orientation orientation;
+}Ship;
+
+Ship ships[] = {{3, Vertical}, {3, Vertical}, {2, Vertical}};
+
+typedef enum{
+  MenuState = 0,
+  PlacementState = 1,
+  ActiveState = 2,
+  PostGame = 3,
+}GameState;
+
+GameState current_state = MenuState;
+
 typedef enum{
   Up = 0,
   Down = 1,
@@ -52,20 +72,16 @@ void setup(void) {
 }
 
 void loop(void) {
-  if (game_started){
-    u8g2.clearBuffer();
-    readJoy();
-    read_button();
-    draw_grid();
-    draw_cursor(grid_x,grid_y);
-    render_current_grid();
-    u8g2.sendBuffer();
-  }
-  else{
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_ncenB14_tf);
-    render_connecting();
-    u8g2.sendBuffer();
+  switch (current_state){
+    case MenuState:
+      MenuState_update();
+      break;
+    case PlacementState:
+      PlacementState_update();
+      break;
+    case ActiveState:
+      ActiveState_update();
+      break;
   }
   reconnect_to_server();
   if (client.available()) 
@@ -74,8 +90,56 @@ void loop(void) {
   }
 }
 
+void MenuState_update(){
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB14_tf);
+  render_connecting();
+  u8g2.sendBuffer();
+}
+
+void PlacementState_update(){
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB14_tf);
+  read_button_placement();
+  u8g2.drawStr(12, 64, "Placement");
+  draw_grid();
+  read_joy_placement();
+  draw_placement_cursor(ships[0], grid_x, grid_y);
+  // readJoy();
+  // read_button();
+  // draw_grid();
+  // draw_cursor(grid_x,grid_y);
+  // render_current_grid();
+  u8g2.sendBuffer();
+}
+
+void ActiveState_update(){
+  u8g2.clearBuffer();
+  readJoy();
+  read_button();
+  draw_grid();
+  draw_cursor(grid_x,grid_y);
+  render_current_grid();
+  u8g2.sendBuffer();
+}
+
+void read_button_placement(){
+  PinStatus button = digitalRead(button_pin);
+  if (button == HIGH){
+    button_pressed = false;
+  }
+  else{
+    if (!button_pressed){
+      if (current_state == PlacementState){
+        current_state = ActiveState;
+      }
+    }
+    button_pressed = true;
+  }
+}
+
+
 void render_connecting(){
-  Serial.println("Screen Connecting");
   if (connected){
     u8g2.drawStr(12, 64, "Connected");
     u8g2.drawStr(12, 84, "Waiting for");
@@ -169,6 +233,92 @@ void draw_cursor(int x, int y){
   u8g2.drawBox(12+20*x, 12+20*y, 20, 20);
 }
 
+void draw_placement_cursor(Ship ship, int x, int y){
+  if (ship.orientation == Vertical){
+    for (int i = y;i<=(y + ship.size - 1);i++){
+      u8g2.drawBox(12+20*x, 12+20*i, 20, 20);
+    }
+  }
+  if (ship.orientation == Horizontal){
+    for (int i = x;i<=(x + ship.size - 1);i++){
+      u8g2.drawBox(12+20*i, 12+20*y, 20, 20);
+    }
+  }
+}
+
+void read_joy_placement(){
+  int pos_x = analogRead(joy_x);
+  int pos_y = analogRead(joy_y);
+  if (pos_x <300){
+    process_joy_input_placement(Left);
+  }
+  else if(pos_x > 700){
+    process_joy_input_placement(Right);
+  }
+  if (pos_y > 700 && pos_y <900){
+    process_joy_input_placement(Down);
+  }
+  else if(pos_y <300){
+    process_joy_input_placement(Up);
+  }
+  else if(pos_y > 900){
+    Serial.println("Click");
+  }
+}
+
+void process_joy_input_placement(JoyPos input){
+  unsigned long current_millis = millis();
+  if (current_millis - previouse_millis > 300){
+    process_joy_pos_placement(input);
+    previouse_millis = current_millis;
+  }
+}
+
+void process_joy_pos_placement(JoyPos input){
+  switch (input){
+    case Up:
+      if (can_place_ship(ships[0], grid_x, grid_y - 1)){
+        grid_y--;
+      }
+      break;
+    case Down:
+      if (can_place_ship(ships[0], grid_x, grid_y + 1)){
+        grid_y++;
+      }
+      break;
+    case Right:
+      if (can_place_ship(ships[0], grid_x + 1, grid_y)){
+        grid_x++;
+      }
+      break;
+    case Left:
+      if (can_place_ship(ships[0], grid_x - 1, grid_y)){
+        grid_x--;
+      }
+      break;
+  }
+  Serial.print("x:");
+  Serial.print(grid_x);
+  Serial.print(" y:");
+  Serial.print(grid_y);
+  Serial.print("\n");
+}
+
+bool can_place_ship(Ship ship, int x, int y){
+  if (ship.orientation == Vertical){
+    if ((y + ship.size -1 < 5)){
+      return true;
+    }
+  }
+  if (ship.orientation == Horizontal){
+    if ((x + ship.size -1 < 5)){
+      return true;
+    }
+  }
+  return false;
+}
+
+
 void readJoy(){
   int pos_x = analogRead(joy_x);
   int pos_y = analogRead(joy_y);
@@ -185,9 +335,7 @@ void readJoy(){
     processJoyInput(Up);
   }
   else if(pos_y > 900){
-    if (!your_turn){
-      your_turn = true;
-    }
+    Serial.println("Click");
   }
 }
 
@@ -330,7 +478,9 @@ void parse_message(String message){
     }
   }
   else if (message.startsWith("GAMESTART")){
-    game_started = true;
+    if (current_state == MenuState){
+      current_state = PlacementState;
+    }
   }
   else if (message.startsWith("DEFENCE")){
     //DEFENCE:3:3:3
@@ -347,7 +497,6 @@ void reconnect_to_server(){
       Serial.println("Connected!");
     
       send_client_registration();
-      send_grid();
     } 
     else 
     {
