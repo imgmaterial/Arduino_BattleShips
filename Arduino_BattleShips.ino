@@ -66,7 +66,6 @@ U8G2_SH1107_SEEED_128X128_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 void setup(void) {
   pinMode(button_pin, INPUT);
   u8g2.begin();
-  intializeShips();
   client_setup();
   previouse_millis = millis();
 }
@@ -105,6 +104,7 @@ void PlacementState_update(){
   draw_grid();
   read_joy_placement();
   draw_placement_cursor(ships[0], grid_x, grid_y);
+  draw_grid_details(battleship_grid);
   // readJoy();
   // read_button();
   // draw_grid();
@@ -130,9 +130,8 @@ void read_button_placement(){
   }
   else{
     if (!button_pressed){
-      if (current_state == PlacementState){
-        current_state = ActiveState;
-      }
+      add_ship_to_grid(ships[0], grid_x, grid_y);
+      
     }
     button_pressed = true;
   }
@@ -177,16 +176,6 @@ void render_current_grid(){
   }
 }
 
-void intializeShips(){
-  battleship_grid[0][0] = 1;
-  battleship_grid[0][1] = 1;
-  battleship_grid[2][0] = 1;
-  battleship_grid[3][0] = 1;
-  battleship_grid[4][1] = 1;
-  battleship_grid[4][2] = 1;
-  battleship_grid[4][3] = 1;
-}
-
 void draw_grid(){
   for (int i = 12; i <= 112; i = i + 20){
     u8g2.drawHLine(12, i, 100);
@@ -214,9 +203,7 @@ void draw_grid_details(int grid[5][5]){
     for (int j = 0;j < 5;j++){
       switch (grid[i][j]){
         case (1):
-          if (!your_turn){
-            drawShade(start_x+i*offset, start_y+j*offset, 20, 20);
-          }
+          drawShade(start_x+i*offset, start_y+j*offset, 20, 20);
           break;
         case (2):
           drawCross(start_x+i*offset, start_y+j*offset, 20, 20);
@@ -231,6 +218,19 @@ void draw_grid_details(int grid[5][5]){
 
 void draw_cursor(int x, int y){
   u8g2.drawBox(12+20*x, 12+20*y, 20, 20);
+}
+
+void add_ship_to_grid(Ship ship, int x, int y){
+  if (ship.orientation == Vertical){
+    for (int i = y;i<=(y + ship.size - 1);i++){
+      battleship_grid[grid_x][i] = 1;
+    }
+  }
+  if (ship.orientation == Horizontal){
+    for (int i = x;i<=(x + ship.size - 1);i++){
+      battleship_grid[i][grid_y] = 1;
+    }
+  }
 }
 
 void draw_placement_cursor(Ship ship, int x, int y){
@@ -262,7 +262,16 @@ void read_joy_placement(){
     process_joy_input_placement(Up);
   }
   else if(pos_y > 900){
-    Serial.println("Click");
+    unsigned long current_millis = millis();
+    if (current_millis - previouse_millis > 300){
+      if (ships[0].orientation == Vertical){
+        ships[0].orientation = Horizontal;
+      }
+      else{
+        ships[0].orientation = Vertical;
+      }
+      previouse_millis = current_millis;
+    }
   }
 }
 
