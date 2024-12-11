@@ -37,7 +37,7 @@ typedef struct{
 }Ship;
 
 Ship ships[] = {{3, Vertical}, {3, Vertical}, {2, Vertical}};
-
+int current_ship_placement = 0;
 typedef enum{
   MenuState = 0,
   PlacementState = 1,
@@ -103,7 +103,7 @@ void PlacementState_update(){
   u8g2.drawStr(12, 64, "Placement");
   draw_grid();
   read_joy_placement();
-  draw_placement_cursor(ships[0], grid_x, grid_y);
+  draw_placement_cursor(ships[current_ship_placement], grid_x, grid_y);
   draw_grid_details(battleship_grid);
   // readJoy();
   // read_button();
@@ -130,8 +130,14 @@ void read_button_placement(){
   }
   else{
     if (!button_pressed){
-      add_ship_to_grid(ships[0], grid_x, grid_y);
-      
+      if (can_place_ships(ships[current_ship_placement], grid_x, grid_y)){
+        add_ship_to_grid(ships[current_ship_placement], grid_x, grid_y);
+        current_ship_placement++;
+        if (current_ship_placement > 2){
+          current_state = ActiveState;
+          send_grid();
+        }
+      }
     }
     button_pressed = true;
   }
@@ -264,11 +270,11 @@ void read_joy_placement(){
   else if(pos_y > 900){
     unsigned long current_millis = millis();
     if (current_millis - previouse_millis > 300){
-      if (ships[0].orientation == Vertical){
-        ships[0].orientation = Horizontal;
+      if (ships[current_ship_placement].orientation == Vertical){
+        ships[current_ship_placement].orientation = Horizontal;
       }
       else{
-        ships[0].orientation = Vertical;
+        ships[current_ship_placement].orientation = Vertical;
       }
       previouse_millis = current_millis;
     }
@@ -286,22 +292,22 @@ void process_joy_input_placement(JoyPos input){
 void process_joy_pos_placement(JoyPos input){
   switch (input){
     case Up:
-      if (can_place_ship(ships[0], grid_x, grid_y - 1)){
+      if (check_movement_boundaries_placement(ships[current_ship_placement], grid_x, grid_y - 1)){
         grid_y--;
       }
       break;
     case Down:
-      if (can_place_ship(ships[0], grid_x, grid_y + 1)){
+      if (check_movement_boundaries_placement(ships[current_ship_placement], grid_x, grid_y + 1)){
         grid_y++;
       }
       break;
     case Right:
-      if (can_place_ship(ships[0], grid_x + 1, grid_y)){
+      if (check_movement_boundaries_placement(ships[current_ship_placement], grid_x + 1, grid_y)){
         grid_x++;
       }
       break;
     case Left:
-      if (can_place_ship(ships[0], grid_x - 1, grid_y)){
+      if (check_movement_boundaries_placement(ships[current_ship_placement], grid_x - 1, grid_y)){
         grid_x--;
       }
       break;
@@ -313,7 +319,25 @@ void process_joy_pos_placement(JoyPos input){
   Serial.print("\n");
 }
 
-bool can_place_ship(Ship ship, int x, int y){
+bool can_place_ships(Ship ship, int x, int y){
+  if (ship.orientation == Vertical){
+    for (int i = y;i<=(y + ship.size - 1);i++){
+      if (battleship_grid[grid_x][i] == 1){
+        return false;
+      }
+    }
+  }
+  if (ship.orientation == Horizontal){
+    for (int i = x;i<=(x + ship.size - 1);i++){
+      if (battleship_grid[i][grid_y] == 1){
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool check_movement_boundaries_placement(Ship ship, int x, int y){
   if (ship.orientation == Vertical){
     if ((y + ship.size -1 < 5) && y >= 0 && x >= 0 && x<5){
       return true;
@@ -533,7 +557,7 @@ String grid_to_string(int grid[5][5]){
   String grid_str = String("");
   for (int i = 0; i<5;i++){
     for (int j = 0; j<5;j++){
-      grid_str = grid_str + String(grid[i][j]);
+      grid_str = grid_str + String(grid[j][i]);
       if (j != 4){
         grid_str = grid_str + String(",");
       }

@@ -80,6 +80,7 @@ async def parse_message(websocket,message):
             for player in players:
                 if split[2] == player.id:
                     player.grid = [list(map(int, x.split(","))) for x in split[1].split(";")]
+                    print(player.grid)
                     await websocket.send("Recieved grid")
         case "ATTACK":
             for player in players:
