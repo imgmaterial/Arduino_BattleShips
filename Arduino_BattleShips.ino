@@ -315,12 +315,12 @@ void process_joy_pos_placement(JoyPos input){
 
 bool can_place_ship(Ship ship, int x, int y){
   if (ship.orientation == Vertical){
-    if ((y + ship.size -1 < 5)){
+    if ((y + ship.size -1 < 5) && y >= 0 && x >= 0 && x<5){
       return true;
     }
   }
   if (ship.orientation == Horizontal){
-    if ((x + ship.size -1 < 5)){
+    if ((x + ship.size -1 < 5 && x >= 0 && y >=0 && y < 5)){
       return true;
     }
   }
