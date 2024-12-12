@@ -100,7 +100,7 @@ void PlacementState_update(){
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_ncenB14_tf);
   read_button_placement();
-  u8g2.drawStr(12, 64, "Placement");
+  u8g2.drawStr(12, 124, "Placement");
   draw_grid();
   read_joy_placement();
   draw_placement_cursor(ships[current_ship_placement], grid_x, grid_y);
@@ -519,11 +519,13 @@ void parse_message(String message){
     else if (message.endsWith("False")){
       your_turn = false;
     }
+    display_message(your_turn?"Your Turn":"Enemy Turn");
   }
   else if (message.startsWith("GAMESTART")){
     if (current_state == MenuState){
       current_state = PlacementState;
     }
+    display_message("Starting Game");
   }
   else if (message.startsWith("DEFENCE")){
     //DEFENCE:3:3:3
@@ -531,6 +533,13 @@ void parse_message(String message){
   }
 }
 
+void display_message(String message){
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB14_tf);
+  u8g2.drawStr(12, 64, message.c_str());
+  u8g2.sendBuffer();
+  delay(650);
+}
 
 void reconnect_to_server(){
   if (!connected){
