@@ -105,11 +105,6 @@ void PlacementState_update(){
   read_joy_placement();
   draw_placement_cursor(ships[current_ship_placement], grid_x, grid_y);
   draw_grid_details(battleship_grid);
-  // readJoy();
-  // read_button();
-  // draw_grid();
-  // draw_cursor(grid_x,grid_y);
-  // render_current_grid();
   u8g2.sendBuffer();
 }
 
@@ -268,7 +263,12 @@ void read_joy_placement(){
     process_joy_input_placement(Up);
   }
   else if(pos_y > 900){
-    unsigned long current_millis = millis();
+    turn_ship_placement();
+  }
+}
+
+void turn_ship_placement(){
+  unsigned long current_millis = millis();
     if (current_millis - previouse_millis > 300){
       if (ships[current_ship_placement].orientation == Vertical){
         ships[current_ship_placement].orientation = Horizontal;
@@ -276,8 +276,18 @@ void read_joy_placement(){
       else{
         ships[current_ship_placement].orientation = Vertical;
       }
+      fix_out_of_bounds_position();
       previouse_millis = current_millis;
     }
+}
+
+void fix_out_of_bounds_position(){
+  Ship ship = ships[current_ship_placement];
+  if (ship.orientation == Horizontal && (grid_x + ship.size - 1) > 4){
+    grid_x = 4 - ship.size + 1;
+  }
+  if (ship.orientation == Vertical && (grid_y + ship.size - 1) > 4){
+    grid_y = 4 - ship.size + 1;
   }
 }
 
