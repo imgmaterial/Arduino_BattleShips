@@ -37,8 +37,12 @@ async def register_player(websocket_id, player_name):
     print(players)
     if (len(players) > 1):
         await broadcast_to_registered("GAMESTART")
-        await send_turn_info()
+        #await send_turn_info()
 
+async def check_victory_conditions():
+    for player in players:
+        if not any(1 in sublist for sublist in player.grid):
+            await broadcast_to_registered(f"GAMEEND:{player.id}")
 
 async def broadcast_to_registered(message):
     for player in players:
@@ -63,12 +67,21 @@ def attack_point(x,y, attacked_player_index):
         attacked_player.grid[y][x] = 3
         print(grid)
         return 3
+    
 
 def other_player_index(index):
     if index == 0:
         return 1
     elif index == 1:
         return 0
+
+def check_player_grid_recived():
+    if (len(players) < 2):
+        return False
+    for player in players:
+        if not player.grid_recived:
+            return False
+    return True
 
 async def parse_message(websocket,message):
     split = message.split(":")
@@ -80,7 +93,9 @@ async def parse_message(websocket,message):
             for player in players:
                 if split[2] == player.id:
                     player.grid = [list(map(int, x.split(","))) for x in split[1].split(";")]
-                    print(player.grid)
+                    player.grid_recived = True
+                    if (check_player_grid_recived()):
+                        await send_turn_info()
                     await websocket.send("Recieved grid")
         case "ATTACK":
             for player in players:
@@ -88,6 +103,7 @@ async def parse_message(websocket,message):
                     result = attack_point(int(split[2]),int(split[3]), other_player_index(players.index(player)))
                     await websocket.send(f"ATTACKRESULT:{split[2]}:{split[3]}:{result}")
                     await players[other_player_index(players.index(player))].websocket.send(f"DEFENCE:{split[2]}:{split[3]}:{result}")
+                    await check_victory_conditions()
                     if result == 3:
                         await change_turns()
         case _:

@@ -26,6 +26,8 @@ int grid_y = 0;
 bool your_turn = true;
 bool button_pressed =false;
 
+bool victory = false;
+
 typedef enum{
   Vertical = 0,
   Horizontal = 1,
@@ -81,6 +83,9 @@ void loop(void) {
     case ActiveState:
       ActiveState_update();
       break;
+    case PostGame:
+      PostGame_update();
+      break;
   }
   reconnect_to_server();
   if (client.available()) 
@@ -118,6 +123,14 @@ void ActiveState_update(){
   u8g2.sendBuffer();
 }
 
+void PostGame_update(){
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB14_tf);
+  read_button_placement();
+  u8g2.drawStr(12, 64, victory?"You Won":"You Lost");
+  u8g2.sendBuffer();
+}
+
 void read_button_placement(){
   PinStatus button = digitalRead(button_pin);
   if (button == HIGH){
@@ -129,7 +142,7 @@ void read_button_placement(){
         add_ship_to_grid(ships[current_ship_placement], grid_x, grid_y);
         current_ship_placement++;
         if (current_ship_placement > 2){
-          current_state = ActiveState;
+          //current_state = ActiveState;
           send_grid();
         }
       }
@@ -513,6 +526,9 @@ void parse_message(String message){
     enemy_grid[String(message[13]).toInt()][String(message[15]).toInt()] = String(message[17]).toInt();
   }
   else if(message.startsWith("TURN")){
+    if (current_state == PlacementState){
+      current_state = ActiveState;
+    }
     if (message.endsWith("True")){
       your_turn = true;
     }
@@ -530,6 +546,15 @@ void parse_message(String message){
   else if (message.startsWith("DEFENCE")){
     //DEFENCE:3:3:3
     battleship_grid[String(message[8]).toInt()][String(message[10]).toInt()] = String(message[12]).toInt();
+  }
+  else if (message.startsWith("GAMEEND")){
+    if (message.endsWith(device_identifier)){
+      victory = false;
+    }
+    else{
+      victory = true;
+    }
+    current_state = PostGame;
   }
 }
 

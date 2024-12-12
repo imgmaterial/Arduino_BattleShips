@@ -10,6 +10,7 @@ class Player():
         self.id = id
         self.turn = False
         self.grid = []
+        self.grid_recived = False
     
     def set_grid(self, grid):
         self.grid = grid
