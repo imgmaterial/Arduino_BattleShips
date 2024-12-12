@@ -11,6 +11,7 @@ class Player():
         self.turn = False
         self.grid = []
         self.grid_recived = False
+        self.game_state = 0
     
     def set_grid(self, grid):
         self.grid = grid

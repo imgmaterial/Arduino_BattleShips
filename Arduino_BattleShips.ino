@@ -20,14 +20,6 @@ int button_pin = 3;
 int joy_x = A1;
 int joy_y = A0;
 
-int grid_x = 0;
-int grid_y = 0;
-
-bool your_turn = true;
-bool button_pressed =false;
-
-bool victory = false;
-
 typedef enum{
   Vertical = 0,
   Horizontal = 1,
@@ -38,8 +30,6 @@ typedef struct{
   Orientation orientation;
 }Ship;
 
-Ship ships[] = {{3, Vertical}, {3, Vertical}, {2, Vertical}};
-int current_ship_placement = 0;
 typedef enum{
   MenuState = 0,
   PlacementState = 1,
@@ -47,7 +37,6 @@ typedef enum{
   PostGame = 3,
 }GameState;
 
-GameState current_state = MenuState;
 
 typedef enum{
   Up = 0,
@@ -57,10 +46,17 @@ typedef enum{
   None = 4,
 }JoyPos;
 
+bool button_pressed =false;
+Ship ships[] = {{3, Vertical}, {3, Vertical}, {2, Vertical}};
+//Game state variables
+int grid_x = 0;
+int grid_y = 0;
+bool your_turn = false;
+bool victory = false;
+int current_ship_placement = 0;
+GameState current_state = MenuState;
 int enemy_grid[5][5];
-
 int battleship_grid[5][5];
-
 unsigned long previouse_millis;
 // display connected to the HW I2C (this is the best option)
 U8G2_SH1107_SEEED_128X128_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
@@ -92,6 +88,18 @@ void loop(void) {
   {
     client.poll();
   }
+}
+
+void GameReset(){
+  grid_x = 0;
+  grid_y = 0;
+  your_turn = false;
+  victory = false;
+  current_ship_placement = 0;
+  current_state = MenuState;
+  enemy_grid[5][5];
+  battleship_grid[5][5];
+  previouse_millis = 0;
 }
 
 void MenuState_update(){
