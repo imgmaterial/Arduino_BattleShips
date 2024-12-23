@@ -1,9 +1,9 @@
 import asyncio
 from websockets.asyncio.server import serve
 from player import Player
+import random
 
 players = []
-turns = [True, False]
 grid = []
 async def handler(websocket):
     async for message in websocket:
@@ -20,7 +20,7 @@ async def main():
 
 async def send_turn_info():
     for i in range(len(players)):
-        msg = f"TURN:{turns[i]}"
+        msg = f"TURN:{players[i].turn}"
         await players[i].websocket.send(msg)
 
 
@@ -55,7 +55,6 @@ async def register_player(websocket_id, player_name):
     if (len(players) > 1):
         await broadcast_to_registered("GAMESTART")
         set_player_states(1)
-        #await send_turn_info()
 
 async def check_victory_conditions():
     for player in players:
@@ -68,11 +67,11 @@ async def broadcast_to_registered(message):
         await player.websocket.send(message)
 
 async def change_turns():
-    global turns
-    if turns == [True, False]:
-        turns = [False, True]
-    elif turns == [False, True]:
-        turns = [True, False]
+    for player in players:
+        if player.turn == True:
+            player.turn = False
+        else:
+            player.turn = True
     await send_turn_info()
 
 
@@ -102,6 +101,10 @@ def check_player_grid_recived():
             return False
     return True
 
+def initialise_player_turns():
+    random_turn = random.randint(0,1)
+    players[random_turn].turn = True
+
 async def parse_message(websocket,message):
     split = message.split(":")
     match split[0]:
@@ -114,6 +117,7 @@ async def parse_message(websocket,message):
                     player.grid = [list(map(int, x.split(","))) for x in split[1].split(";")]
                     player.grid_recived = True
                     if (check_player_grid_recived()):
+                        initialise_player_turns()
                         await send_turn_info()
                     await websocket.send("Recieved grid")
                     set_player_states(2)
