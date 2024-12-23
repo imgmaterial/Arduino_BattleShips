@@ -564,6 +564,9 @@ void parse_message(String message){
     }
     current_state = PostGame;
   }
+  else if(message.startsWith("STATE")){
+    recive_state_after_reconnect(message);
+  }
 }
 
 void display_message(String message){
@@ -620,4 +623,26 @@ String grid_to_string(int grid[5][5]){
   }
   Serial.println(grid_str);
   return grid_str;
+}
+//Parsing the state string
+//i0  0  0  0  0  1  1  1  1  1  2 
+//j0  1  2  3  4  0  1  2  3  4  0
+// 10 12 14 16 18 20 22 24 26 28 30
+//Example STATE:1:2:2,0,1,1,1,2,0,0,0,0,2,0,1,0,0,3,0,1,0,0,0,0,0,0,0:1,0,1,1,0,1,0,0,0,1,0,0,3,0,1,0,0,0,0,1,0,0,0,0,0
+void recive_state_after_reconnect(String state){
+  your_turn = String(state[6]).toInt();
+  current_state = (GameState)String(state[8]).toInt();
+  if (current_state < 2){return;}
+  int initial_index = 10;
+  for (int i = 0;i < 5;i++){
+    for (int j = 0; j<5;j++){
+      battleship_grid[j][i] = String(state[initial_index + j*2 + i*10]).toInt();
+    }
+  }
+  initial_index = 60;
+  for (int i = 0;i < 5;i++){
+    for (int j = 0; j<5;j++){
+      enemy_grid[j][i] = String(state[initial_index + j*2 + i*10]).toInt();
+    }
+  }
 }

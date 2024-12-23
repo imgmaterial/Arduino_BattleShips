@@ -24,10 +24,12 @@ async def send_turn_info():
         await players[i].websocket.send(msg)
 
 
-def grid_to_string(grid):
+def grid_to_string(grid, is_player):
     merged_list = sum(grid, [])
     print(merged_list)
     output = ','.join(str(x) for x in merged_list)
+    if not is_player:
+        output = output.replace("1","0")
     return output
 
 def set_player_states(state):
@@ -35,7 +37,7 @@ def set_player_states(state):
         player.game_state = state
 
 async def send_player_state(player):
-    message = f"STATE:{int(player.turn)}:{player.game_state}:{grid_to_string(player.grid)}"
+    message = f"STATE:{int(player.turn)}:{player.game_state}:{grid_to_string(player.grid, True)}:{grid_to_string(players[other_player_index(players.index(player))].grid, False)}"
     await player.websocket.send(message)
 
 
