@@ -57,6 +57,11 @@
   #define BOARD_NAME    BOARD_TYPE
 #endif
 
+#ifndef SCREEN_TYPE
+  //Screen type can be set "TFT" or "I2C"
+  #define SCREEN_TYPE "TFT"
+#endif
+
 #include <WiFiNINA_Generic.h>
 
 #define DEBUG_WEBSOCKETS_PORT     Serial
