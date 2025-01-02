@@ -56,7 +56,7 @@ int grid_y = 0;
 bool your_turn = false;
 bool victory = false;
 int current_ship_placement = 0;
-GameState current_state = ActiveState;
+GameState current_state = MenuState;
 int enemy_grid[5][5];
 int battleship_grid[5][5];
 unsigned long previouse_millis;
@@ -83,11 +83,13 @@ Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
 
 void setup(void) {
   //tft.fillScreen(ILI9341_BLACK);
-  tft.begin();
-  tft.setRotation(3);
   pinMode(button_pin, INPUT);
   if (SCREEN_TYPE == "I2C"){
     u8g2.begin();
+  }
+  else if (SCREEN_TYPE == "TFT"){
+    tft.begin();
+    tft.setRotation(3);
   }
   client_setup();
   previouse_millis = millis();
@@ -131,37 +133,57 @@ void GameReset(){
 }
 
 void MenuState_update(){
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_ncenB14_tf);
-  render_connecting();
-  u8g2.sendBuffer();
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_ncenB14_tf);
+  }
+  else if (SCREEN_TYPE == "TFT"){
+    tft.fillScreen(ILI9341_BLACK);
+  }
+  if (SCREEN_TYPE == "I2C"){
+    render_connecting();
+    u8g2.sendBuffer();
+  }
+  else if(SCREEN_TYPE == "TFT"){
+    TFT_draw_menu_state();
+  }
 }
 
 void PlacementState_update(){
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_ncenB14_tf);
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_ncenB14_tf);
+  }
+  else if(SCREEN_TYPE == "TFT"){
+    tft.fillScreen(ILI9341_BLACK);
+  }
   read_button_placement();
-  u8g2.drawStr(12, 124, "Placement");
-  draw_grid();
   read_joy_placement();
-  draw_placement_cursor(ships[current_ship_placement], grid_x, grid_y);
-  draw_grid_details(battleship_grid);
-  u8g2.sendBuffer();
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.drawStr(12, 124, "Placement");
+    draw_grid();
+    draw_placement_cursor(ships[current_ship_placement], grid_x, grid_y);
+    draw_grid_details(battleship_grid);
+    u8g2.sendBuffer();
+  }
+  else if (SCREEN_TYPE == "TFT"){
+    TFT_draw_grid();
+    TFT_draw_placement_cursor(ships[current_ship_placement],grid_x, grid_y);
+    TFT_render_current_grid();
+    //TFT_draw_details(your_turn);
+    TFT_draw_legend();
+  }
 }
 
 void ActiveState_update(){
-  Serial.println("Active State");
   if (SCREEN_TYPE == "I2C"){
     u8g2.clearBuffer();
   }
   else if(SCREEN_TYPE == "TFT"){
-    Serial.println("Pepega");
     tft.fillScreen(ILI9341_BLACK);
   }
-  Serial.println("Active State 1");
   readJoy();
   read_button();
-  Serial.println("Active State 2");
   if (SCREEN_TYPE == "I2C"){
     draw_grid();
     draw_cursor(grid_x,grid_y);
@@ -172,17 +194,21 @@ void ActiveState_update(){
     TFT_draw_grid();
     TFT_draw_cursor(grid_x, grid_y);
     TFT_render_current_grid();
+    TFT_draw_details(your_turn);
+    TFT_draw_legend();
   }
-  Serial.println("Active State 3");
-  Serial.println("Active State End");
 }
 
 void PostGame_update(){
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_ncenB14_tf);
-  read_button_placement();
-  u8g2.drawStr(12, 64, victory?"You Won":"You Lost");
-  u8g2.sendBuffer();
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_ncenB14_tf);
+    u8g2.drawStr(12, 64, victory?"You Won":"You Lost");
+    u8g2.sendBuffer();
+  }
+  else if (SCREEN_TYPE == "TFT"){
+    TFT_draw_postgame_state();
+  }
 }
 
 void read_button_placement(){
@@ -589,13 +615,23 @@ void parse_message(String message){
     else if (message.endsWith("False")){
       your_turn = false;
     }
-    display_message(your_turn?"Your Turn":"Enemy Turn");
+    if (SCREEN_TYPE == "I2C"){
+      display_message(your_turn?"Your Turn":"Enemy Turn");
+    }
+    else if (SCREEN_TYPE == "TFT"){
+      TFT_display_message(your_turn?"Your Turn":"Enemy Turn");
+    }
   }
   else if (message.startsWith("GAMESTART")){
     if (current_state == MenuState){
       current_state = PlacementState;
     }
-    display_message("Starting Game");
+    if (SCREEN_TYPE == "I2C"){
+      display_message("Starting Game");
+    }
+    else if (SCREEN_TYPE == "TFT"){
+      TFT_display_message("Starting Game");
+    }
   }
   else if (message.startsWith("DEFENCE")){
     //DEFENCE:3:3:3
@@ -743,18 +779,18 @@ void TFT_draw_grid_details(int grid[5][5]) {
     for (int j = 0; j < 5; j++) {
       switch (grid[i][j]) {
         case (1): {
-          int squareX = startX + j * squareSize;        // Top-left X of the square
-          int squareY = startY + i * squareSize;        // Top-left Y of the square
-          drawShade(squareX, squareY, squareSize, squareSize); // Shade the square
+          int squareX = startX + i * squareSize;        // Top-left X of the square
+          int squareY = startY + j * squareSize;        // Top-left Y of the square
+          TFT_drawShade(squareX, squareY, squareSize, squareSize); // Shade the square
           break; }
         case (2): {
-          int squareX = startX + j * squareSize;        // Top-left X of the square
-          int squareY = startY + i * squareSize;        // Top-left Y of the square
-          drawCross(squareX, squareY, squareSize, squareSize); // Draw an X in the square
+          int squareX = startX + i * squareSize;        // Top-left X of the square
+          int squareY = startY + j * squareSize;        // Top-left Y of the square
+          TFT_drawCross(squareX, squareY, squareSize, squareSize); // Draw an X in the square
           break; }
         case (3): {
-          int circleX = startX + j * squareSize + squareSize / 2; // X-center of the square
-          int circleY = startY + i * squareSize + squareSize / 2; // Y-center of the square
+          int circleX = startX + i * squareSize + squareSize / 2; // X-center of the square
+          int circleY = startY + j * squareSize + squareSize / 2; // Y-center of the square
           tft.drawCircle(circleX, circleY, radius, ILI9341_BLUE); // Draw circle in the center // Circle miss
           break; }
       }
@@ -774,7 +810,6 @@ void TFT_render_current_grid(){
 
 void TFT_drawShade(int16_t start_x, int16_t start_y, int16_t width, int16_t height) {
     int16_t spacing = 5; 
-
     // Draw diagonal lines over grid 
     for (int16_t x = 0; x <= width; x += spacing) {
         tft.drawLine(start_x + x, start_y, start_x, start_y + x, ILI9341_YELLOW);
@@ -790,9 +825,29 @@ void TFT_drawCross(int16_t start_x, int16_t start_y, int16_t width, int16_t heig
     tft.drawLine(start_x, start_y + height, start_x + width, start_y, ILI9341_RED); 
 }
 
-void TFT_draw_details(int state){
-  switch (state){
-    case (1): {
+void TFT_draw_placement_cursor(Ship ship, int x, int y){
+  if (ship.orientation == Vertical){
+    for (int i = y;i<=(y + ship.size - 1);i++){
+      //u8g2.drawBox(12+20*x, 12+20*i, 20, 20);
+      int squareX = startX + x * squareSize;        // Top-left X of the square
+      int squareY = startY + i * squareSize;        // Top-left Y of the square
+      //TFT_drawCross(squareX, squareY, squareSize, squareSize); // Draw an X in the square
+      tft.fillRect(squareX, squareY, squareSize, squareSize, ILI9341_WHITE);
+    }
+  }
+  if (ship.orientation == Horizontal){
+    for (int i = x;i<=(x + ship.size - 1);i++){
+      //u8g2.drawBox(12+20*i, 12+20*y, 20, 20);
+      int squareX = startX + i * squareSize;        // Top-left X of the square
+      int squareY = startY + y * squareSize;        // Top-left Y of the square
+      tft.fillRect(squareX, squareY, squareSize, squareSize, ILI9341_WHITE);
+    }
+  }
+}
+
+void TFT_draw_details(bool turn){
+  switch (turn){
+    case (false): {
       tft.setCursor(50, (screenWidth - gridWidth) / 2 - 25);
       tft.setTextColor(ILI9341_RED);
       tft.setTextSize(2); // Adjust size as needed
@@ -806,7 +861,7 @@ void TFT_draw_details(int state){
       tft.setTextSize(1); // Adjust size as needed
       tft.println("Waiting for enemy action..."); 
       break; }
-    case (2): {
+    case (true): {
       tft.setCursor(50, (screenWidth - gridWidth) / 2 - 25);
       tft.setTextColor(ILI9341_GREEN);
       tft.setTextSize(2); // Adjust size as needed
@@ -823,13 +878,29 @@ void TFT_draw_details(int state){
   }
 }
 
-void TFT_draw_cursor(int x, int y) {
-  Serial.print("x:");
-  Serial.print(x);
-  Serial.print(" y:");
-  Serial.print(y);
-  Serial.print("\n");
+void TFT_draw_menu_state(){
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setCursor(25, screenWidth/2);
+  tft.setTextSize(3);
+  tft.println("Waiting for game start");
+}
 
+void TFT_draw_postgame_state(){
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setCursor(25, screenWidth/2);
+  tft.setTextSize(3);
+  tft.println(victory?"You Won!":"You Lost!");
+}
+
+void TFT_display_message(String message){
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setCursor(25, screenWidth/2);
+  tft.setTextSize(3);
+  tft.println(message);
+  delay(650);
+}
+
+void TFT_draw_cursor(int x, int y) {
   int centerX = startX + x * squareSize + squareSize / 2; // Center X of the grid box
   int centerY = startY + y * squareSize + squareSize / 2; // Center Y of the grid box
 
@@ -850,6 +921,58 @@ void TFT_draw_cursor(int x, int y) {
   }
 }
 
+void TFT_draw_legend() {
+  // Draw the legend box
+  int legendX = screenWidth - 40; // Hardcoded for the bottom-right corner
+  int legendY = 183; 
+  int boxWidth = 120;
+  int boxHeight = 40;
 
+  // Draw the outline
+  tft.drawRect(legendX, legendY, boxWidth, boxHeight, ILI9341_WHITE);
+  
+  // Legend item dimensions
+  int iconX = legendX + 5;   // Starting X position for icons
+  int iconY = legendY + 5;   // Starting Y position for icons
+  int iconSpacingX = 55;     // Horizontal spacing between items
+  int iconSpacingY = 20;     // Vertical spacing between rows
+
+  // Row 1: Shaded Square and Cross (SHIP & HIT)
+  // Case 1: Shaded Square (SHIP)
+  TFT_drawShade(iconX, iconY, 10, 10); // Draw a small shaded square
+  tft.setCursor(iconX + 15, iconY);
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setTextSize(1);
+  tft.print("Ship");
+
+  // Cross (HIT)
+  int iconX2 = iconX + iconSpacingX;
+  TFT_drawCross(iconX2, iconY, 10, 10); // Draw a small cross
+  tft.setCursor(iconX2 + 15, iconY);
+  tft.print("Hit");
+
+  // Row 2: Circle and Crosshair (MISS & CURSOR)
+  iconY += iconSpacingY;
+  // Circle (MISS)
+  tft.drawCircle(iconX + 5, iconY + 5, 5, ILI9341_BLUE); 
+  tft.setCursor(iconX + 15, iconY);
+  tft.print("Miss");
+
+  // Crosshair (CURSOR)
+  int iconX3 = iconX + iconSpacingX;
+  int iconY3 = iconY; 
+  int centerX = iconX3 + 5;  
+  int centerY = iconY3 + 5;  
+  int circleRadius = 5; 
+  int lineLength = 7;      
+
+  tft.drawCircle(centerX, centerY, circleRadius, ILI9341_WHITE); 
+
+  tft.drawFastVLine(centerX, centerY - lineLength, 2 * lineLength, ILI9341_WHITE);
+  tft.drawFastHLine(centerX - lineLength, centerY, 2 * lineLength, ILI9341_WHITE);
+
+  tft.setCursor(iconX3 + 15, iconY);
+  tft.print("Cursor");
+}
 
 
