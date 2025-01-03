@@ -166,7 +166,7 @@ void PlacementState_update(){
   else if (SCREEN_TYPE == "TFT"){
     TFT_draw_grid();
     TFT_draw_placement_cursor(ships[current_ship_placement],grid_x, grid_y);
-    TFT_render_current_grid();
+    //TFT_render_current_grid();
     //TFT_draw_details(your_turn);
     TFT_draw_legend();
   }
@@ -240,6 +240,9 @@ void read_button_placement(){
     if (!button_pressed){
       if (can_place_ships(ships[current_ship_placement], grid_x, grid_y)){
         add_ship_to_grid(ships[current_ship_placement], grid_x, grid_y);
+        if (SCREEN_TYPE == "TFT"){
+          TFT_draw_placement_after_cursor(ships[current_ship_placement], grid_x, grid_y);
+        }
         current_ship_placement++;
         if (current_ship_placement > 2){
           //current_state = ActiveState;
@@ -383,6 +386,9 @@ void read_joy_placement(){
 void turn_ship_placement(){
   unsigned long current_millis = millis();
     if (current_millis - previouse_millis > 300){
+      if (SCREEN_TYPE == "TFT"){
+        TFT_draw_placement_after_cursor(ships[current_ship_placement], grid_x, grid_y);
+      }
       if (ships[current_ship_placement].orientation == Vertical){
         ships[current_ship_placement].orientation = Horizontal;
       }
@@ -413,6 +419,9 @@ void process_joy_input_placement(JoyPos input){
 }
 
 void process_joy_pos_placement(JoyPos input){
+  if (SCREEN_TYPE == "TFT"){
+    TFT_draw_placement_after_cursor(ships[current_ship_placement], grid_x, grid_y);
+  }
   switch (input){
     case Up:
       if (check_movement_boundaries_placement(ships[current_ship_placement], grid_x, grid_y - 1)){
@@ -876,6 +885,20 @@ void TFT_draw_placement_cursor(Ship ship, int x, int y){
     }
   }
 }
+
+void TFT_draw_placement_after_cursor(Ship ship, int x, int y){
+  if (ship.orientation == Vertical){
+    for (int i = y;i<=(y + ship.size - 1);i++){
+      TFT_render_grid_position(x, i, battleship_grid);
+    }
+  }
+  if (ship.orientation == Horizontal){
+    for (int i = x;i<=(x + ship.size - 1);i++){
+      TFT_render_grid_position(i, y, battleship_grid);
+    }
+  }
+}
+
 
 void TFT_draw_details(bool turn){
   switch (turn){
