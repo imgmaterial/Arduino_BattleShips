@@ -91,6 +91,7 @@ void setup(void) {
     tft.begin();
     tft.setRotation(3);
   }
+  Menu_initialise();
   client_setup();
   previouse_millis = millis();
 }
@@ -134,15 +135,9 @@ void MenuState_update(){
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_ncenB14_tf);
   }
-  else if (SCREEN_TYPE == "TFT"){
-    tft.fillScreen(ILI9341_BLACK);
-  }
   if (SCREEN_TYPE == "I2C"){
     render_connecting();
     u8g2.sendBuffer();
-  }
-  else if(SCREEN_TYPE == "TFT"){
-    TFT_draw_menu_state();
   }
 }
 
@@ -150,9 +145,6 @@ void PlacementState_update(){
   if (SCREEN_TYPE == "I2C"){
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_ncenB14_tf);
-  }
-  else if(SCREEN_TYPE == "TFT"){
-    //tft.fillScreen(ILI9341_BLACK);
   }
   read_button_placement();
   read_joy_placement();
@@ -166,8 +158,6 @@ void PlacementState_update(){
   else if (SCREEN_TYPE == "TFT"){
     TFT_draw_grid();
     TFT_draw_placement_cursor(ships[current_ship_placement],grid_x, grid_y);
-    //TFT_render_current_grid();
-    //TFT_draw_details(your_turn);
     TFT_draw_legend();
   }
 }
@@ -175,10 +165,6 @@ void PlacementState_update(){
 void ActiveState_update(){
   if (SCREEN_TYPE == "I2C"){
     u8g2.clearBuffer();
-  }
-  else if(SCREEN_TYPE == "TFT"){
-    //tft.fillScreen(ILI9341_BLACK);
-    // TFT_render_grid_position(grid_x,grid_y,your_turn?battleship_grid:enemy_grid);
   }
   readJoy();
   read_button();
@@ -189,11 +175,7 @@ void ActiveState_update(){
     u8g2.sendBuffer();
   }
   else if(SCREEN_TYPE == "TFT"){
-    //TFT_draw_grid();
     TFT_draw_cursor(grid_x, grid_y);
-    //TFT_render_current_grid();
-    //TFT_draw_details(your_turn);
-    //TFT_draw_legend();
   }
 }
 
@@ -204,14 +186,21 @@ void PostGame_update(){
     u8g2.drawStr(12, 64, victory?"You Won":"You Lost");
     u8g2.sendBuffer();
   }
-  else if (SCREEN_TYPE == "TFT"){
-    TFT_draw_postgame_state();
+}
+
+void Menu_initialise(){
+  current_state = MenuState;
+  Serial.println(current_state);
+  if (SCREEN_TYPE == "TFT"){
+    tft.fillScreen(ILI9341_BLACK);
+    TFT_draw_menu_state();
   }
 }
 
 void Menu_to_Placement_transition(){
   if (current_state != MenuState){return;}
   current_state = PlacementState;
+  Serial.println(current_state);
   if (SCREEN_TYPE == "TFT"){
     tft.fillScreen(ILI9341_BLACK);
     TFT_draw_grid();
@@ -222,12 +211,23 @@ void Menu_to_Placement_transition(){
 void Placement_to_Active_transition(){
   if (current_state != PlacementState){return;}
   current_state = ActiveState;
+  Serial.println(current_state);
   if (SCREEN_TYPE == "TFT"){
     tft.fillScreen(ILI9341_BLACK);
     TFT_draw_grid();
     TFT_draw_legend();
     TFT_render_current_grid();
     TFT_draw_details(your_turn);
+  }
+}
+
+void Active_to_Postgame_transition(){
+  if (current_state != ActiveState){return;}
+  current_state = PostGame;
+  Serial.println(current_state);
+  if (SCREEN_TYPE == "TFT"){
+    tft.fillScreen(ILI9341_BLACK);
+    TFT_draw_postgame_state();
   }
 }
 
@@ -245,7 +245,6 @@ void read_button_placement(){
         }
         current_ship_placement++;
         if (current_ship_placement > 2){
-          //current_state = ActiveState;
           send_grid();
         }
       }
@@ -637,9 +636,6 @@ void parse_message(String message){
     }
   }
   else if(message.startsWith("TURN")){
-    // if (current_state == PlacementState){
-    //   current_state = ActiveState;
-    // }
     if (message.endsWith("True")){
       your_turn = true;
     }
@@ -650,7 +646,6 @@ void parse_message(String message){
       display_message(your_turn?"Your Turn":"Enemy Turn");
     }
     else if (SCREEN_TYPE == "TFT"){
-      //TFT_display_message(your_turn?"Your Turn":"Enemy Turn");
       TFT_render_current_grid();
     }
     Placement_to_Active_transition();
@@ -681,7 +676,7 @@ void parse_message(String message){
     else{
       victory = true;
     }
-    current_state = PostGame;
+    Active_to_Postgame_transition();
   }
   else if(message.startsWith("STATE")){
     recive_state_after_reconnect(message);
