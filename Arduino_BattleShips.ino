@@ -198,8 +198,8 @@ void Menu_initialise(){
   }
 }
 
-void Menu_to_Placement_transition(){
-  if (current_state != MenuState){return;}
+void Menu_to_Placement_transition(bool check_state){
+  if (check_state && current_state != MenuState){return;}
   current_state = PlacementState;
   Serial.println(current_state);
   if (SCREEN_TYPE == "TFT"){
@@ -210,8 +210,8 @@ void Menu_to_Placement_transition(){
   }
 }
 
-void Placement_to_Active_transition(){
-  if (current_state != PlacementState){return;}
+void Placement_to_Active_transition(bool check_state){
+  if (check_state && current_state != PlacementState){return;}
   current_state = ActiveState;
   Serial.println(current_state);
   if (SCREEN_TYPE == "TFT"){
@@ -224,8 +224,8 @@ void Placement_to_Active_transition(){
   }
 }
 
-void Active_to_Postgame_transition(){
-  if (current_state != ActiveState){return;}
+void Active_to_Postgame_transition(bool check_state){
+  if (check_state && current_state != ActiveState){return;}
   current_state = PostGame;
   Serial.println(current_state);
   if (SCREEN_TYPE == "TFT"){
@@ -651,7 +651,7 @@ void parse_message(String message){
     else if (SCREEN_TYPE == "TFT"){
       TFT_render_current_grid();
     }
-    Placement_to_Active_transition();
+    Placement_to_Active_transition(true);
   }
   else if (message.startsWith("GAMESTART")){
     // if (current_state == MenuState){
@@ -663,7 +663,7 @@ void parse_message(String message){
     else if (SCREEN_TYPE == "TFT"){
       TFT_display_message("Starting Game");
     }
-    Menu_to_Placement_transition();
+    Menu_to_Placement_transition(true);
   }
   else if (message.startsWith("DEFENCE")){
     //DEFENCE:3:3:3
@@ -679,7 +679,7 @@ void parse_message(String message){
     else{
       victory = true;
     }
-    Active_to_Postgame_transition();
+    Active_to_Postgame_transition(true);
   }
   else if(message.startsWith("STATE")){
     recive_state_after_reconnect(message);
@@ -938,10 +938,27 @@ void TFT_draw_menu_state(){
 }
 
 void TFT_draw_postgame_state(){
-  tft.setTextColor(ILI9341_WHITE);
-  tft.setCursor(25, screenWidth/2);
-  tft.setTextSize(3);
-  tft.println(victory?"You Won!":"You Lost!");
+  TFT_win_loss(victory);
+}
+
+void TFT_win_loss(bool win) {
+  if (win) {
+    // Fill the screen with green color
+    tft.fillScreen(ILI9341_GREEN);
+
+    tft.setTextColor(ILI9341_BLACK);
+    tft.setTextSize(3); // Text size
+    tft.setCursor(80, screenWidth/2);
+    tft.print("You Win!!");
+  } else{
+    // Fill the screen with green color
+    tft.fillScreen(ILI9341_RED);
+
+    tft.setTextColor(ILI9341_BLACK);
+    tft.setTextSize(3); // Text size
+    tft.setCursor(80, screenWidth/2);
+    tft.print("You Lose!!");
+  }
 }
 
 void TFT_display_message(String message){
