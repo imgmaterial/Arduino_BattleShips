@@ -748,8 +748,19 @@ String grid_to_string(int grid[5][5]){
 //Example STATE:1:2:2,0,1,1,1,2,0,0,0,0,2,0,1,0,0,3,0,1,0,0,0,0,0,0,0:1,0,1,1,0,1,0,0,0,1,0,0,3,0,1,0,0,0,0,1,0,0,0,0,0
 void recive_state_after_reconnect(String state){
   your_turn = String(state[6]).toInt();
-  current_state = (GameState)String(state[8]).toInt();
-  if (current_state < 2){return;}
+  GameState new_state = (GameState)String(state[8]).toInt();
+  
+  if (new_state < 2){
+    switch (new_state){
+      case 0:
+        Menu_initialise();
+        break;
+      case 1:
+        Menu_to_Placement_transition(false);
+        break;
+    }
+    return;
+  }
   int initial_index = 10;
   for (int i = 0;i < 5;i++){
     for (int j = 0; j<5;j++){
@@ -762,6 +773,15 @@ void recive_state_after_reconnect(String state){
       enemy_grid[j][i] = String(state[initial_index + j*2 + i*10]).toInt();
     }
   }
+  switch (new_state){
+      case 2:
+        Placement_to_Active_transition(false);
+        break;
+      case 3:
+        Active_to_Postgame_transition(false);
+        break;
+    }
+
 }
 
 
