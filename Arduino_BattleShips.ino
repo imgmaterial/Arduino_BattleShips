@@ -4,7 +4,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include "Adafruit_ILI9341.h"
-
+#include "boat.h"
 #include "defines.h"
 
 #include <WebSockets2_Generic.h>
@@ -60,6 +60,7 @@ GameState current_state = MenuState;
 int enemy_grid[5][5];
 int battleship_grid[5][5];
 unsigned long previouse_millis;
+int boats[3] = {0,0,0};
 // display connected to the HW I2C (this is the best option)
 U8G2_SH1107_SEEED_128X128_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
@@ -205,6 +206,7 @@ void Menu_to_Placement_transition(){
     tft.fillScreen(ILI9341_BLACK);
     TFT_draw_grid();
     TFT_draw_legend();
+    TFT_draw_boats(boats);
   }
 }
 
@@ -217,6 +219,7 @@ void Placement_to_Active_transition(){
     TFT_draw_grid();
     TFT_draw_legend();
     TFT_render_current_grid();
+    TFT_draw_boats(boats);
     TFT_draw_details(your_turn);
   }
 }
@@ -836,6 +839,7 @@ void TFT_render_current_grid(){
   TFT_draw_details(your_turn);
   TFT_draw_grid();
   TFT_draw_legend();
+  TFT_draw_boats(boats);
   if (your_turn){
     TFT_draw_grid_details(enemy_grid);
   }
@@ -864,10 +868,8 @@ void TFT_drawCross(int16_t start_x, int16_t start_y, int16_t width, int16_t heig
 void TFT_draw_placement_cursor(Ship ship, int x, int y){
   if (ship.orientation == Vertical){
     for (int i = y;i<=(y + ship.size - 1);i++){
-      //u8g2.drawBox(12+20*x, 12+20*i, 20, 20);
       int squareX = startX + x * squareSize;        // Top-left X of the square
       int squareY = startY + i * squareSize;        // Top-left Y of the square
-      //TFT_drawCross(squareX, squareY, squareSize, squareSize); // Draw an X in the square
       tft.fillRect(squareX, squareY, squareSize, squareSize, ILI9341_WHITE);
     }
   }
@@ -1023,6 +1025,58 @@ void TFT_draw_legend() {
 
   tft.setCursor(iconX3 + 15, iconY);
   tft.print("Cursor");
+}
+
+void TFT_draw_boats(int boatState[3]){
+  int boatX = screenWidth - 30;
+  int s_boatX = screenWidth - 30 + (BOAT_MEDIUM_WIDTH - BOAT_SMALL_WIDTH) / 2; //Center small boat
+  int boatY = 45;
+  //Draw the small boat
+  tft.drawBitmap(s_boatX, boatY, small_boat, BOAT_SMALL_WIDTH, BOAT_HEIGHT, ILI9341_WHITE);
+  //Draw lines under small boat to display size 
+  tft.drawFastHLine(s_boatX, boatY+6 + BOAT_HEIGHT, BOAT_SMALL_WIDTH, ILI9341_WHITE);
+  tft.drawFastVLine(s_boatX, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(s_boatX+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(s_boatX+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  //If small boat destroyed -> draw cross over it
+  if(boatState[0] == 0){
+    int x = s_boatX+35/2;
+    drawCross(x, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    drawCross(x-1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    drawCross(x+1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+  }
+
+  boatY += 45; //Increment space between boats
+  tft.drawBitmap(boatX, boatY, medium_boat, BOAT_MEDIUM_WIDTH, BOAT_HEIGHT, ILI9341_WHITE);
+  //Draw lines under medium boat to display size 
+  tft.drawFastHLine(boatX, boatY+6 + BOAT_HEIGHT, BOAT_MEDIUM_WIDTH, ILI9341_WHITE);
+  tft.drawFastVLine(boatX, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  //If medium boat destroyed -> draw cross over it
+  if(boatState[1] == 0){
+    int x = boatX+70/2;
+    drawCross(x, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    drawCross(x-1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    drawCross(x+1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+  }
+
+  boatY += 45;
+  tft.drawBitmap(boatX, boatY, medium_boat, BOAT_MEDIUM_WIDTH, BOAT_HEIGHT, ILI9341_WHITE);
+  //Draw lines under medium boat 2 to display size 
+  tft.drawFastHLine(boatX, boatY+6 + BOAT_HEIGHT, BOAT_MEDIUM_WIDTH, ILI9341_WHITE);
+  tft.drawFastVLine(boatX, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  //If the second medium boat destroyed -> draw cross over it
+  if(boatState[2] == 0){
+    int x = boatX+70/2;
+    drawCross(x, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    drawCross(x-1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    drawCross(x+1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+  }
 }
 
 
