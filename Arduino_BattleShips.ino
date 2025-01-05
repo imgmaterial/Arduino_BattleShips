@@ -789,7 +789,9 @@ void parse_message(String message){
       Serial.print(enemy_boats[i]);
     }
     Serial.print("\n");
-    TFT_render_current_grid();
+    if (SCREEN_TYPE == "TFT"){
+      TFT_render_current_grid();
+    }
   }
 }
 
