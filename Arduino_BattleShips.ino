@@ -22,6 +22,11 @@ int button_pin = 3;
 int joy_x = A1;
 int joy_y = A0;
 
+typedef struct{
+  int x;
+  int y;
+}Vec2;
+
 typedef enum{
   Vertical = 0,
   Horizontal = 1,
@@ -30,6 +35,8 @@ typedef enum{
 typedef struct{
   int size;
   Orientation orientation;
+  Vec2 position[3];
+  bool square_hit[3] = {true,true,true};
 }Ship;
 
 typedef enum{
@@ -82,6 +89,8 @@ int startX = 20; // Center horizontally and offset left
 int startY = (screenWidth - gridWidth) / 2 + 15;     // Center vertically
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
 
+
+bool start_connection = false;
 void setup(void) {
   //tft.fillScreen(ILI9341_BLACK);
   pinMode(button_pin, INPUT);
@@ -112,7 +121,9 @@ void loop(void) {
       PostGame_update();
       break;
   }
-  reconnect_to_server();
+  if (start_connection){
+    reconnect_to_server();
+  }
   if (client.available()) 
   {
     client.poll();
@@ -140,6 +151,7 @@ void MenuState_update(){
     render_connecting();
     u8g2.sendBuffer();
   }
+  read_button_menu();
 }
 
 void PlacementState_update(){
@@ -234,6 +246,19 @@ void Active_to_Postgame_transition(bool check_state){
   }
 }
 
+void read_button_menu(){
+  PinStatus button = digitalRead(button_pin);
+  if (button == HIGH){
+    button_pressed = false;
+  }
+  else{
+    if (!button_pressed){
+      start_connection = true;
+    }
+    button_pressed = true;
+  }
+}
+
 void read_button_placement(){
   PinStatus button = digitalRead(button_pin);
   if (button == HIGH){
@@ -242,7 +267,7 @@ void read_button_placement(){
   else{
     if (!button_pressed){
       if (can_place_ships(ships[current_ship_placement], grid_x, grid_y)){
-        add_ship_to_grid(ships[current_ship_placement], grid_x, grid_y);
+        add_ship_to_grid(&ships[current_ship_placement], grid_x, grid_y);
         if (SCREEN_TYPE == "TFT"){
           TFT_draw_placement_after_cursor(ships[current_ship_placement], grid_x, grid_y);
         }
@@ -339,17 +364,41 @@ void draw_cursor(int x, int y){
   u8g2.drawBox(12+20*x, 12+20*y, 20, 20);
 }
 
-void add_ship_to_grid(Ship ship, int x, int y){
-  if (ship.orientation == Vertical){
-    for (int i = y;i<=(y + ship.size - 1);i++){
+void add_ship_to_grid(Ship* ship, int x, int y){
+  int ship_square = 0;
+  if (ship->orientation == Vertical){
+    for (int i = y;i<=(y + ship->size - 1);i++){
       battleship_grid[grid_x][i] = 1;
+      ship->position[ship_square].x = x;
+      ship->position[ship_square].y = i;
+      ship->square_hit[ship_square] = false;
+      ship_square++;
     }
   }
-  if (ship.orientation == Horizontal){
-    for (int i = x;i<=(x + ship.size - 1);i++){
+  if (ship->orientation == Horizontal){
+    for (int i = x;i<=(x + ship->size - 1);i++){
       battleship_grid[i][grid_y] = 1;
+      ship->position[ship_square].x = i;
+      ship->position[ship_square].y = y;
+      ship->square_hit[ship_square] = false;
+      ship_square++;
     }
   }
+  for (int i = 0;i<3;i++){
+    Serial.print(ship->square_hit[i]);
+  }
+  Serial.print("\n");
+}
+
+void check_if_ship_destroyed(Ship* ship){
+  bool destroyed = false;
+  for (int i = 0; i<3;i++){
+    if (!(ship->square_hit[i])){
+      return desroyed;
+    }
+  }
+  destroyed = true;
+  return destroyed;
 }
 
 void draw_placement_cursor(Ship ship, int x, int y){
@@ -624,9 +673,6 @@ void client_setup()
 
   // run callback when events are occuring
   client.onEvent(onEventsCallback);
-  
-  // try to connect to Websockets server
-  reconnect_to_server();
 }
 
 void parse_message(String message){
@@ -951,10 +997,11 @@ void TFT_draw_details(bool turn){
 }
 
 void TFT_draw_menu_state(){
-  tft.setTextColor(ILI9341_WHITE);
-  tft.setCursor(25, screenWidth/2);
-  tft.setTextSize(3);
-  tft.println("Waiting for game start");
+  tft.setTextColor(ILI9341_BLACK);
+  tft.setTextSize(3); // Text size
+  tft.setCursor(80 + 10, screenWidth/2 + 10);
+  tft.fillRect(75,screenWidth/2, 170, 40, ILI9341_WHITE);
+  tft.print("Connect");
 }
 
 void TFT_draw_postgame_state(){
