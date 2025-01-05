@@ -427,8 +427,20 @@ void destroyed_ships(){
       if (boats != prev_boats && SCREEN_TYPE == "TFT"){
         TFT_render_current_grid();
       }
+      send_boat_information();
     }
   }
+}
+
+String send_boat_information(){
+  String message = "BOATS";
+  for (int i =0;i<3;i++){
+    message+= ":" + String(boats[i]);
+  }
+  message += String(device_identifier);
+  Serial.println(message);
+  client.send(message);
+  return message;
 }
 
 void draw_placement_cursor(Ship ship, int x, int y){
@@ -764,6 +776,20 @@ void parse_message(String message){
   }
   else if(message.startsWith("STATE")){
     recive_state_after_reconnect(message);
+  }
+  else if(message.startsWith("ENEMYBOATS")){
+    //ENEMYBOATS :  1  :  0  :  1
+    //0123456789 10 11 12 13 14 15
+    int start = 11;
+    for (int i = 0;i<3;i++){
+      enemy_boats[i] = String(message[start+2*i]).toInt();
+    }
+    Serial.print("Enemy boats");
+    for (int i = 0;i<3;i++){
+      Serial.print(enemy_boats[i]);
+    }
+    Serial.print("\n");
+    TFT_render_current_grid();
   }
 }
 
