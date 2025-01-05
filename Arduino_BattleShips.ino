@@ -2,7 +2,9 @@
 #include <U8g2lib.h>
 #include <SPI.h>
 #include <Wire.h>
-
+#include <Adafruit_GFX.h>
+#include "Adafruit_ILI9341.h"
+#include "boat.h"
 #include "defines.h"
 
 #include <WebSockets2_Generic.h>
@@ -20,6 +22,11 @@ int button_pin = 3;
 int joy_x = A1;
 int joy_y = A0;
 
+typedef struct{
+  int x;
+  int y;
+}Vec2;
+
 typedef enum{
   Vertical = 0,
   Horizontal = 1,
@@ -28,6 +35,9 @@ typedef enum{
 typedef struct{
   int size;
   Orientation orientation;
+  Vec2 position[3];
+  bool square_hit[3] = {true,true,true};
+  bool destroyed = false;
 }Ship;
 
 typedef enum{
@@ -47,7 +57,7 @@ typedef enum{
 }JoyPos;
 
 bool button_pressed =false;
-Ship ships[] = {{3, Vertical}, {3, Vertical}, {2, Vertical}};
+Ship ships[] = {{2, Vertical},{3, Vertical}, {3, Vertical}};
 //Game state variables
 int grid_x = 0;
 int grid_y = 0;
@@ -58,12 +68,42 @@ GameState current_state = MenuState;
 int enemy_grid[5][5];
 int battleship_grid[5][5];
 unsigned long previouse_millis;
+int boats[3] = {0,0,0};
+int enemy_boats[3] = {0,0,0};
 // display connected to the HW I2C (this is the best option)
 U8G2_SH1107_SEEED_128X128_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
+//TFT Screen definition
+#define TFT_DC 9
+#define TFT_CS 10
+
+// Screen dimensions
+int screenWidth = 240;
+int screenHeight = 320;
+
+// Grid Varibales
+int squareSize = 35; //Can be changed to make grid smaller or bigger
+int gridSize = 5;    
+// Calculate the grid total width
+int gridWidth = squareSize * gridSize;
+
+int startX = 20; // Center horizontally and offset left
+int startY = (screenWidth - gridWidth) / 2 + 15;     // Center vertically
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
+
+
+bool start_connection = false;
 void setup(void) {
+  //tft.fillScreen(ILI9341_BLACK);
   pinMode(button_pin, INPUT);
-  u8g2.begin();
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.begin();
+  }
+  else if (SCREEN_TYPE == "TFT"){
+    tft.begin();
+    tft.setRotation(3);
+  }
+  Menu_initialise();
   client_setup();
   previouse_millis = millis();
 }
@@ -83,7 +123,9 @@ void loop(void) {
       PostGame_update();
       break;
   }
-  reconnect_to_server();
+  if (start_connection){
+    reconnect_to_server();
+  }
   if (client.available()) 
   {
     client.poll();
@@ -103,40 +145,120 @@ void GameReset(){
 }
 
 void MenuState_update(){
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_ncenB14_tf);
-  render_connecting();
-  u8g2.sendBuffer();
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_ncenB14_tf);
+  }
+  if (SCREEN_TYPE == "I2C"){
+    render_connecting();
+    u8g2.sendBuffer();
+  }
+  read_button_menu();
 }
 
 void PlacementState_update(){
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_ncenB14_tf);
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_ncenB14_tf);
+  }
   read_button_placement();
-  u8g2.drawStr(12, 124, "Placement");
-  draw_grid();
   read_joy_placement();
-  draw_placement_cursor(ships[current_ship_placement], grid_x, grid_y);
-  draw_grid_details(battleship_grid);
-  u8g2.sendBuffer();
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.drawStr(12, 124, "Placement");
+    draw_grid();
+    draw_placement_cursor(ships[current_ship_placement], grid_x, grid_y);
+    draw_grid_details(battleship_grid);
+    u8g2.sendBuffer();
+  }
+  else if (SCREEN_TYPE == "TFT"){
+    TFT_draw_grid();
+    TFT_draw_placement_cursor(ships[current_ship_placement],grid_x, grid_y);
+    TFT_draw_legend();
+  }
 }
 
 void ActiveState_update(){
-  u8g2.clearBuffer();
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.clearBuffer();
+  }
   readJoy();
   read_button();
-  draw_grid();
-  draw_cursor(grid_x,grid_y);
-  render_current_grid();
-  u8g2.sendBuffer();
+  if (SCREEN_TYPE == "I2C"){
+    draw_grid();
+    draw_cursor(grid_x,grid_y);
+    render_current_grid();
+    u8g2.sendBuffer();
+  }
+  else if(SCREEN_TYPE == "TFT"){
+    TFT_draw_cursor(grid_x, grid_y);
+  }
 }
 
 void PostGame_update(){
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_ncenB14_tf);
-  read_button_placement();
-  u8g2.drawStr(12, 64, victory?"You Won":"You Lost");
-  u8g2.sendBuffer();
+  if (SCREEN_TYPE == "I2C"){
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_ncenB14_tf);
+    u8g2.drawStr(12, 64, victory?"You Won":"You Lost");
+    u8g2.sendBuffer();
+  }
+}
+
+void Menu_initialise(){
+  current_state = MenuState;
+  Serial.println(current_state);
+  if (SCREEN_TYPE == "TFT"){
+    tft.fillScreen(ILI9341_BLACK);
+    TFT_draw_menu_state();
+  }
+}
+
+void Menu_to_Placement_transition(bool check_state){
+  if (check_state && current_state != MenuState){return;}
+  current_state = PlacementState;
+  Serial.println(current_state);
+  if (SCREEN_TYPE == "TFT"){
+    tft.fillScreen(ILI9341_BLACK);
+    TFT_draw_grid();
+    TFT_draw_legend();
+    TFT_draw_boats(boats);
+  }
+}
+
+void Placement_to_Active_transition(bool check_state){
+  if (check_state && current_state != PlacementState){return;}
+  current_state = ActiveState;
+  Serial.println(current_state);
+  if (SCREEN_TYPE == "TFT"){
+    tft.fillScreen(ILI9341_BLACK);
+    TFT_draw_grid();
+    TFT_draw_legend();
+    TFT_render_current_grid();
+    TFT_draw_boats(boats);
+    TFT_draw_details(your_turn);
+  }
+}
+
+void Active_to_Postgame_transition(bool check_state){
+  if (check_state && current_state != ActiveState){return;}
+  current_state = PostGame;
+  Serial.println(current_state);
+  if (SCREEN_TYPE == "TFT"){
+    tft.fillScreen(ILI9341_BLACK);
+    TFT_draw_postgame_state();
+  }
+}
+
+void read_button_menu(){
+  PinStatus button = digitalRead(button_pin);
+  if (button == HIGH){
+    button_pressed = false;
+  }
+  else{
+    if (!button_pressed){
+      start_connection = true;
+    }
+    button_pressed = true;
+  }
 }
 
 void read_button_placement(){
@@ -147,10 +269,12 @@ void read_button_placement(){
   else{
     if (!button_pressed){
       if (can_place_ships(ships[current_ship_placement], grid_x, grid_y)){
-        add_ship_to_grid(ships[current_ship_placement], grid_x, grid_y);
+        add_ship_to_grid(&ships[current_ship_placement], grid_x, grid_y);
+        if (SCREEN_TYPE == "TFT"){
+          TFT_draw_placement_after_cursor(ships[current_ship_placement], grid_x, grid_y);
+        }
         current_ship_placement++;
         if (current_ship_placement > 2){
-          //current_state = ActiveState;
           send_grid();
         }
       }
@@ -242,17 +366,81 @@ void draw_cursor(int x, int y){
   u8g2.drawBox(12+20*x, 12+20*y, 20, 20);
 }
 
-void add_ship_to_grid(Ship ship, int x, int y){
-  if (ship.orientation == Vertical){
-    for (int i = y;i<=(y + ship.size - 1);i++){
+void add_ship_to_grid(Ship* ship, int x, int y){
+  int ship_square = 0;
+  if (ship->orientation == Vertical){
+    for (int i = y;i<=(y + ship->size - 1);i++){
       battleship_grid[grid_x][i] = 1;
+      ship->position[ship_square].x = x;
+      ship->position[ship_square].y = i;
+      ship->square_hit[ship_square] = false;
+      ship_square++;
     }
   }
-  if (ship.orientation == Horizontal){
-    for (int i = x;i<=(x + ship.size - 1);i++){
+  if (ship->orientation == Horizontal){
+    for (int i = x;i<=(x + ship->size - 1);i++){
       battleship_grid[i][grid_y] = 1;
+      ship->position[ship_square].x = i;
+      ship->position[ship_square].y = y;
+      ship->square_hit[ship_square] = false;
+      ship_square++;
     }
   }
+  for (int i = 0;i<3;i++){
+    Serial.print(ship->square_hit[i]);
+  }
+  Serial.print("\n");
+}
+
+bool check_if_ship_destroyed(Ship* ship){
+  if (ship->destroyed){
+    return false;
+  }
+  bool destroyed = false;
+  for (int i = 0; i<3;i++){
+    if (!(ship->square_hit[i])){
+      return destroyed;
+    }
+  }
+  destroyed = true;
+  ship->destroyed = true;
+  return destroyed;
+}
+
+void attack_ship_square(int x, int y){
+  Vec2 attack_pos = {x,y};
+  for (int ship_index = 0; ship_index<3;ship_index++){
+    for (int ship_square = 0; ship_square<3;ship_square++){
+      Ship* ship = &(ships[ship_index]);
+      if (ship->position[ship_square].x == attack_pos.x && ship->position[ship_square].y == attack_pos.y){
+        ship->square_hit[ship_square] = true;
+      }
+    }
+  }
+}
+
+void destroyed_ships(){
+  int prev_boats[3] = {boats[0],boats[1],boats[2]};
+  for (int i = 0; i<3;i++){
+    if (check_if_ship_destroyed(&(ships[i]))){
+      boats[i] = 1;
+      if (boats != prev_boats && SCREEN_TYPE == "TFT"){
+        TFT_render_current_grid();
+      }
+      send_boat_information();
+    }
+  }
+}
+
+String send_boat_information(){
+  String message = "BOATS";
+  for (int i =0;i<3;i++){
+    message+= ":" + String(boats[i]);
+  }
+  message += String(device_identifier);
+  Serial.println(message);
+  client.send(message);
+  return message;
 }
 
 void draw_placement_cursor(Ship ship, int x, int y){
@@ -291,6 +479,9 @@ void read_joy_placement(){
 void turn_ship_placement(){
   unsigned long current_millis = millis();
     if (current_millis - previouse_millis > 300){
+      if (SCREEN_TYPE == "TFT"){
+        TFT_draw_placement_after_cursor(ships[current_ship_placement], grid_x, grid_y);
+      }
       if (ships[current_ship_placement].orientation == Vertical){
         ships[current_ship_placement].orientation = Horizontal;
       }
@@ -321,6 +512,9 @@ void process_joy_input_placement(JoyPos input){
 }
 
 void process_joy_pos_placement(JoyPos input){
+  if (SCREEN_TYPE == "TFT"){
+    TFT_draw_placement_after_cursor(ships[current_ship_placement], grid_x, grid_y);
+  }
   switch (input){
     case Up:
       if (check_movement_boundaries_placement(ships[current_ship_placement], grid_x, grid_y - 1)){
@@ -343,11 +537,6 @@ void process_joy_pos_placement(JoyPos input){
       }
       break;
   }
-  Serial.print("x:");
-  Serial.print(grid_x);
-  Serial.print(" y:");
-  Serial.print(grid_y);
-  Serial.print("\n");
 }
 
 bool can_place_ships(Ship ship, int x, int y){
@@ -412,6 +601,9 @@ void processJoyInput(JoyPos input){
 }
 
 void processJoyPos(JoyPos input){
+  if (SCREEN_TYPE == "TFT"){
+    TFT_render_grid_position(grid_x,grid_y,your_turn?enemy_grid:battleship_grid);
+  }
   switch (input){
     case Up:
       grid_y--;
@@ -522,9 +714,6 @@ void client_setup()
 
   // run callback when events are occuring
   client.onEvent(onEventsCallback);
-  
-  // try to connect to Websockets server
-  reconnect_to_server();
 }
 
 void parse_message(String message){
@@ -532,28 +721,49 @@ void parse_message(String message){
   if (message.startsWith("ATTACKRESULT")){
     //12 15 17
     enemy_grid[String(message[13]).toInt()][String(message[15]).toInt()] = String(message[17]).toInt();
+    if (SCREEN_TYPE == "TFT"){
+      TFT_render_grid_position(String(message[13]).toInt(),String(message[15]).toInt(),your_turn?enemy_grid:battleship_grid);
+    }
   }
   else if(message.startsWith("TURN")){
-    if (current_state == PlacementState){
-      current_state = ActiveState;
-    }
     if (message.endsWith("True")){
       your_turn = true;
     }
     else if (message.endsWith("False")){
       your_turn = false;
     }
-    display_message(your_turn?"Your Turn":"Enemy Turn");
+    if (SCREEN_TYPE == "I2C"){
+      display_message(your_turn?"Your Turn":"Enemy Turn");
+    }
+    else if (SCREEN_TYPE == "TFT"){
+      TFT_render_current_grid();
+    }
+    Placement_to_Active_transition(true);
   }
   else if (message.startsWith("GAMESTART")){
-    if (current_state == MenuState){
-      current_state = PlacementState;
+    // if (current_state == MenuState){
+    //   current_state = PlacementState;
+    // }
+    if (SCREEN_TYPE == "I2C"){
+      display_message("Starting Game");
     }
-    display_message("Starting Game");
+    else if (SCREEN_TYPE == "TFT"){
+      TFT_display_message("Starting Game");
+    }
+    Menu_to_Placement_transition(true);
   }
   else if (message.startsWith("DEFENCE")){
     //DEFENCE:3:3:3
     battleship_grid[String(message[8]).toInt()][String(message[10]).toInt()] = String(message[12]).toInt();
+    attack_ship_square(String(message[8]).toInt(), String(message[10]).toInt());
+    destroyed_ships();
+    for (int i = 0;i<3;i++){
+      Serial.print(boats[i]);
+    }
+    Serial.print("\n");
+    if (SCREEN_TYPE == "TFT"){
+      TFT_render_grid_position(String(message[8]).toInt(),String(message[10]).toInt(),your_turn?enemy_grid:battleship_grid);
+    }
   }
   else if (message.startsWith("GAMEEND")){
     if (message.endsWith(device_identifier)){
@@ -562,10 +772,24 @@ void parse_message(String message){
     else{
       victory = true;
     }
-    current_state = PostGame;
+    Active_to_Postgame_transition(true);
   }
   else if(message.startsWith("STATE")){
     recive_state_after_reconnect(message);
+  }
+  else if(message.startsWith("ENEMYBOATS")){
+    //ENEMYBOATS :  1  :  0  :  1
+    //0123456789 10 11 12 13 14 15
+    int start = 11;
+    for (int i = 0;i<3;i++){
+      enemy_boats[i] = String(message[start+2*i]).toInt();
+    }
+    Serial.print("Enemy boats");
+    for (int i = 0;i<3;i++){
+      Serial.print(enemy_boats[i]);
+    }
+    Serial.print("\n");
+    TFT_render_current_grid();
   }
 }
 
@@ -631,8 +855,19 @@ String grid_to_string(int grid[5][5]){
 //Example STATE:1:2:2,0,1,1,1,2,0,0,0,0,2,0,1,0,0,3,0,1,0,0,0,0,0,0,0:1,0,1,1,0,1,0,0,0,1,0,0,3,0,1,0,0,0,0,1,0,0,0,0,0
 void recive_state_after_reconnect(String state){
   your_turn = String(state[6]).toInt();
-  current_state = (GameState)String(state[8]).toInt();
-  if (current_state < 2){return;}
+  GameState new_state = (GameState)String(state[8]).toInt();
+  
+  if (new_state < 2){
+    switch (new_state){
+      case 0:
+        Menu_initialise();
+        break;
+      case 1:
+        Menu_to_Placement_transition(false);
+        break;
+    }
+    return;
+  }
   int initial_index = 10;
   for (int i = 0;i < 5;i++){
     for (int j = 0; j<5;j++){
@@ -645,4 +880,363 @@ void recive_state_after_reconnect(String state){
       enemy_grid[j][i] = String(state[initial_index + j*2 + i*10]).toInt();
     }
   }
+  switch (new_state){
+      case 2:
+        Placement_to_Active_transition(false);
+        break;
+      case 3:
+        Active_to_Postgame_transition(false);
+        break;
+    }
+
 }
+
+
+/////////////////////////////////////////////////////////////////////
+//________________________________________________________________//
+//________________________________________________________________//
+//___________________TFT SCREEN FUNCTIONS_________________________//
+//________________________________________________________________//
+//________________________________________________________________//
+////////////////////////////////////////////////////////////////////
+
+
+void TFT_draw_grid_cover(){
+  tft.fillRect(startX, startY, gridWidth, gridWidth, ILI9341_BLACK);
+}
+
+void TFT_draw_grid(){
+  //Draws the grid.
+  for (int i = 0; i <= gridSize; i++) {
+      int pos = startX + i * squareSize;
+      tft.drawFastHLine(startX, startY + i * squareSize, gridWidth, ILI9341_WHITE); 
+      tft.drawFastVLine(pos, startY, gridWidth, ILI9341_WHITE);                    
+  }
+}
+
+void TFT_render_grid_position(int x, int y, int grid[5][5]){
+  int squareX = startX + x * squareSize;        // Top-left X of the square
+  int squareY = startY + y * squareSize;
+  tft.fillRect(squareX, squareY, squareSize, squareSize, ILI9341_BLACK);
+  tft.drawRect(squareX, squareY, squareSize, squareSize, ILI9341_WHITE);
+  switch (grid[x][y]) {
+    case (1): {
+      TFT_drawShade(squareX, squareY, squareSize, squareSize); // Shade the square
+      break; }
+    case (2): {
+      TFT_drawCross(squareX, squareY, squareSize, squareSize); // Draw an X in the square
+      break; }
+    case (3): {
+      int circleX = startX + x * squareSize + squareSize / 2; // X-center of the square
+      int circleY = startY + y * squareSize + squareSize / 2; // Y-center of the square
+      int radius = 15;
+      tft.drawCircle(circleX, circleY, radius, ILI9341_BLUE); // Draw circle in the center // Circle miss
+      break; }
+    }
+}
+
+void TFT_draw_grid_details(int grid[5][5]) { 
+  int radius = 15; // Circle radius
+  for (int i = 0; i < 5; i++) {
+    for (int j = 0; j < 5; j++) {
+      switch (grid[i][j]) {
+        case (1): {
+          int squareX = startX + i * squareSize;        // Top-left X of the square
+          int squareY = startY + j * squareSize;        // Top-left Y of the square
+          TFT_drawShade(squareX, squareY, squareSize, squareSize); // Shade the square
+          break; }
+        case (2): {
+          int squareX = startX + i * squareSize;        // Top-left X of the square
+          int squareY = startY + j * squareSize;        // Top-left Y of the square
+          TFT_drawCross(squareX, squareY, squareSize, squareSize); // Draw an X in the square
+          break; }
+        case (3): {
+          int circleX = startX + i * squareSize + squareSize / 2; // X-center of the square
+          int circleY = startY + j * squareSize + squareSize / 2; // Y-center of the square
+          tft.drawCircle(circleX, circleY, radius, ILI9341_BLUE); // Draw circle in the center // Circle miss
+          break; }
+      }
+    }
+  }
+}
+
+
+void TFT_render_current_grid(){
+  tft.fillScreen(ILI9341_BLACK);
+  TFT_draw_details(your_turn);
+  TFT_draw_grid();
+  TFT_draw_legend();
+  if (your_turn){
+    TFT_draw_grid_details(enemy_grid);
+    TFT_draw_boats(enemy_boats);
+  }
+  else{
+    TFT_draw_grid_details(battleship_grid);
+    TFT_draw_boats(boats);
+  }
+}
+
+void TFT_drawShade(int16_t start_x, int16_t start_y, int16_t width, int16_t height) {
+    int16_t spacing = 5; 
+    // Draw diagonal lines over grid 
+    for (int16_t x = 0; x <= width; x += spacing) {
+        tft.drawLine(start_x + x, start_y, start_x, start_y + x, ILI9341_YELLOW);
+    }
+    for (int16_t y = spacing; y <= height; y += spacing) {
+        tft.drawLine(start_x + width, start_y + y, start_x + y, start_y + height, ILI9341_YELLOW);
+    }
+}
+
+
+void TFT_drawCross(int16_t start_x, int16_t start_y, int16_t width, int16_t height) {
+    tft.drawLine(start_x, start_y, start_x + width, start_y + height, ILI9341_RED); 
+    tft.drawLine(start_x, start_y + height, start_x + width, start_y, ILI9341_RED); 
+}
+
+void TFT_draw_placement_cursor(Ship ship, int x, int y){
+  if (ship.orientation == Vertical){
+    for (int i = y;i<=(y + ship.size - 1);i++){
+      int squareX = startX + x * squareSize;        // Top-left X of the square
+      int squareY = startY + i * squareSize;        // Top-left Y of the square
+      tft.fillRect(squareX, squareY, squareSize, squareSize, ILI9341_WHITE);
+    }
+  }
+  if (ship.orientation == Horizontal){
+    for (int i = x;i<=(x + ship.size - 1);i++){
+      //u8g2.drawBox(12+20*i, 12+20*y, 20, 20);
+      int squareX = startX + i * squareSize;        // Top-left X of the square
+      int squareY = startY + y * squareSize;        // Top-left Y of the square
+      tft.fillRect(squareX, squareY, squareSize, squareSize, ILI9341_WHITE);
+    }
+  }
+}
+
+void TFT_draw_placement_after_cursor(Ship ship, int x, int y){
+  if (ship.orientation == Vertical){
+    for (int i = y;i<=(y + ship.size - 1);i++){
+      TFT_render_grid_position(x, i, battleship_grid);
+    }
+  }
+  if (ship.orientation == Horizontal){
+    for (int i = x;i<=(x + ship.size - 1);i++){
+      TFT_render_grid_position(i, y, battleship_grid);
+    }
+  }
+}
+
+
+void TFT_draw_details(bool turn){
+  switch (turn){
+    case (false): {
+      tft.setCursor(50, (screenWidth - gridWidth) / 2 - 25);
+      tft.setTextColor(ILI9341_RED);
+      tft.setTextSize(2); 
+      tft.println("Enemy Turn");
+
+      tft.setCursor(50, (screenWidth - gridWidth) / 2 - 8);
+      tft.setTextColor(ILI9341_WHITE);
+      tft.setTextSize(2); 
+      tft.println("Your Fleet");
+
+      tft.setCursor(35, (screenWidth - gridWidth) / 2 + 195);
+      tft.setTextColor(ILI9341_RED);
+      tft.setTextSize(1); 
+      tft.println("Waiting for enemy action..."); 
+
+      tft.setCursor(screenWidth - 40, (screenWidth - gridWidth) / 2 - 8);
+      tft.setTextColor(ILI9341_GREEN);
+      tft.setTextSize(2); 
+      tft.println("Your Ships"); 
+      break; }
+    case (true): {
+      tft.setCursor(50, (screenWidth - gridWidth) / 2 - 25);
+      tft.setTextColor(ILI9341_GREEN);
+      tft.setTextSize(2); 
+      tft.println("Your Turn");
+
+      tft.setCursor(45, (screenWidth - gridWidth) / 2 - 8);
+      tft.setTextColor(ILI9341_WHITE);
+      tft.setTextSize(2); 
+      tft.println("Enemy Fleet");
+
+      tft.setCursor(50, (screenWidth - gridWidth) / 2 + 195);
+      tft.setTextColor(ILI9341_RED);
+      tft.setTextSize(1); 
+      tft.println("Choose your target!"); 
+
+      tft.setCursor(screenWidth - 55, (screenWidth - gridWidth) / 2 - 8);
+      tft.setTextColor(ILI9341_RED);
+      tft.setTextSize(2); 
+      tft.println("Enemy Ships"); 
+      break; }
+  }
+}
+
+void TFT_draw_menu_state(){
+  tft.setTextColor(ILI9341_BLACK);
+  tft.setTextSize(3); // Text size
+  tft.setCursor(80 + 10, screenWidth/2 + 10);
+  tft.fillRect(75,screenWidth/2, 170, 40, ILI9341_WHITE);
+  tft.print("Connect");
+}
+
+void TFT_draw_postgame_state(){
+  TFT_win_loss(victory);
+}
+
+void TFT_win_loss(bool win) {
+  if (win) {
+    // Fill the screen with green color
+    tft.fillScreen(ILI9341_GREEN);
+
+    tft.setTextColor(ILI9341_BLACK);
+    tft.setTextSize(3); // Text size
+    tft.setCursor(80, screenWidth/2);
+    tft.print("You Win!!");
+  } else{
+    // Fill the screen with green color
+    tft.fillScreen(ILI9341_RED);
+
+    tft.setTextColor(ILI9341_BLACK);
+    tft.setTextSize(3); // Text size
+    tft.setCursor(80, screenWidth/2);
+    tft.print("You Lose!!");
+  }
+}
+
+void TFT_display_message(String message){
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setCursor(25, screenWidth/2);
+  tft.setTextSize(3);
+  tft.println(message);
+  delay(650);
+}
+
+void TFT_draw_cursor(int x, int y) {
+  int centerX = startX + x * squareSize + squareSize / 2; // Center X of the grid box
+  int centerY = startY + y * squareSize + squareSize / 2; // Center Y of the grid box
+
+  int circleRadius = 12; 
+  int lineLength = 15;   
+  int repeat = 3;     
+
+  for (int i = 0; i < repeat; i++) {
+    tft.drawCircle(centerX, centerY, circleRadius + i, ILI9341_WHITE);
+  }
+
+  for (int i = -repeat / 2; i <= repeat / 2; i++) {
+    tft.drawFastVLine(centerX + i, centerY - lineLength, 2 * lineLength, ILI9341_WHITE);
+  }
+
+  for (int i = -repeat / 2; i <= repeat / 2; i++) {
+    tft.drawFastHLine(centerX - lineLength, centerY + i, 2 * lineLength, ILI9341_WHITE);
+  }
+}
+
+void TFT_draw_legend() {
+  // Draw the legend box
+  int legendX = screenWidth - 40; // Hardcoded for the bottom-right corner
+  int legendY = 183; 
+  int boxWidth = 120;
+  int boxHeight = 40;
+
+  // Draw the outline
+  tft.drawRect(legendX, legendY, boxWidth, boxHeight, ILI9341_WHITE);
+  
+  // Legend item dimensions
+  int iconX = legendX + 5;   // Starting X position for icons
+  int iconY = legendY + 5;   // Starting Y position for icons
+  int iconSpacingX = 55;     // Horizontal spacing between items
+  int iconSpacingY = 20;     // Vertical spacing between rows
+
+  // Row 1: Shaded Square and Cross (SHIP & HIT)
+  // Case 1: Shaded Square (SHIP)
+  TFT_drawShade(iconX, iconY, 10, 10); // Draw a small shaded square
+  tft.setCursor(iconX + 15, iconY);
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setTextSize(1);
+  tft.print("Ship");
+
+  // Cross (HIT)
+  int iconX2 = iconX + iconSpacingX;
+  TFT_drawCross(iconX2, iconY, 10, 10); // Draw a small cross
+  tft.setCursor(iconX2 + 15, iconY);
+  tft.print("Hit");
+
+  // Row 2: Circle and Crosshair (MISS & CURSOR)
+  iconY += iconSpacingY;
+  // Circle (MISS)
+  tft.drawCircle(iconX + 5, iconY + 5, 5, ILI9341_BLUE); 
+  tft.setCursor(iconX + 15, iconY);
+  tft.print("Miss");
+
+  // Crosshair (CURSOR)
+  int iconX3 = iconX + iconSpacingX;
+  int iconY3 = iconY; 
+  int centerX = iconX3 + 5;  
+  int centerY = iconY3 + 5;  
+  int circleRadius = 5; 
+  int lineLength = 7;      
+
+  tft.drawCircle(centerX, centerY, circleRadius, ILI9341_WHITE); 
+
+  tft.drawFastVLine(centerX, centerY - lineLength, 2 * lineLength, ILI9341_WHITE);
+  tft.drawFastHLine(centerX - lineLength, centerY, 2 * lineLength, ILI9341_WHITE);
+
+  tft.setCursor(iconX3 + 15, iconY);
+  tft.print("Cursor");
+}
+
+void TFT_draw_boats(int boatState[3]){
+  int boatX = screenWidth - 30;
+  int s_boatX = screenWidth - 30 + (BOAT_MEDIUM_WIDTH - BOAT_SMALL_WIDTH) / 2; //Center small boat
+  int boatY = 45;
+  //Draw the small boat
+  tft.drawBitmap(s_boatX, boatY, small_boat, BOAT_SMALL_WIDTH, BOAT_HEIGHT, ILI9341_WHITE);
+  //Draw lines under small boat to display size 
+  tft.drawFastHLine(s_boatX, boatY+6 + BOAT_HEIGHT, BOAT_SMALL_WIDTH, ILI9341_WHITE);
+  tft.drawFastVLine(s_boatX, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(s_boatX+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(s_boatX+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  //If small boat destroyed -> draw cross over it
+  if(boatState[0] == 1){
+    int x = s_boatX+35/2;
+    TFT_drawCross(x, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    TFT_drawCross(x-1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    TFT_drawCross(x+1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+  }
+
+  boatY += 45; //Increment space between boats
+  tft.drawBitmap(boatX, boatY, medium_boat, BOAT_MEDIUM_WIDTH, BOAT_HEIGHT, ILI9341_WHITE);
+  //Draw lines under medium boat to display size 
+  tft.drawFastHLine(boatX, boatY+6 + BOAT_HEIGHT, BOAT_MEDIUM_WIDTH, ILI9341_WHITE);
+  tft.drawFastVLine(boatX, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  //If medium boat destroyed -> draw cross over it
+  if(boatState[1] == 1){
+    int x = boatX+70/2;
+    TFT_drawCross(x, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    TFT_drawCross(x-1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    TFT_drawCross(x+1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+  }
+
+  boatY += 45;
+  tft.drawBitmap(boatX, boatY, medium_boat, BOAT_MEDIUM_WIDTH, BOAT_HEIGHT, ILI9341_WHITE);
+  //Draw lines under medium boat 2 to display size 
+  tft.drawFastHLine(boatX, boatY+6 + BOAT_HEIGHT, BOAT_MEDIUM_WIDTH, ILI9341_WHITE);
+  tft.drawFastVLine(boatX, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  tft.drawFastVLine(boatX+35+35+35, boatY+1 + BOAT_HEIGHT, 10, ILI9341_WHITE);
+  //If the second medium boat destroyed -> draw cross over it
+  if(boatState[2] == 1){
+    int x = boatX+70/2;
+    TFT_drawCross(x, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    TFT_drawCross(x-1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+    TFT_drawCross(x+1, boatY, BOAT_HEIGHT, BOAT_HEIGHT);
+  }
+}
+
+
