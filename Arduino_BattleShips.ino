@@ -394,7 +394,7 @@ void add_ship_to_grid(Ship* ship, int x, int y){
 
 bool check_if_ship_destroyed(Ship* ship){
   if (ship->destroyed){
-    return true;
+    return false;
   }
   bool destroyed = false;
   for (int i = 0; i<3;i++){
@@ -425,7 +425,6 @@ void destroyed_ships(){
     if (check_if_ship_destroyed(&(ships[i]))){
       boats[i] = 1;
       if (boats != prev_boats && SCREEN_TYPE == "TFT"){
-        Serial.println("Destroyed ship");
         TFT_render_current_grid();
       }
     }
