@@ -101,7 +101,7 @@ void setup(void) {
   }
   else if (SCREEN_TYPE == "TFT"){
     tft.begin();
-    tft.setRotation(3);
+    tft.setRotation(1);
   }
   Menu_initialise();
   client_setup();
@@ -437,7 +437,7 @@ String send_boat_information(){
   for (int i =0;i<3;i++){
     message+= ":" + String(boats[i]);
   }
-  message += String(device_identifier);
+  message += ":" + String(device_identifier);
   Serial.println(message);
   client.send(message);
   return message;
@@ -789,7 +789,9 @@ void parse_message(String message){
       Serial.print(enemy_boats[i]);
     }
     Serial.print("\n");
-    TFT_render_current_grid();
+    if (SCREEN_TYPE == "TFT"){
+      TFT_render_current_grid();
+    }
   }
 }
 
