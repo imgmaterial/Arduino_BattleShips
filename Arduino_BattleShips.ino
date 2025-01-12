@@ -250,7 +250,7 @@ void Active_to_Postgame_transition(bool check_state){
 
 void read_button_menu(){
   PinStatus button = digitalRead(button_pin);
-  if (button == HIGH){
+  if (button == LOW){
     button_pressed = false;
   }
   else{
@@ -263,7 +263,7 @@ void read_button_menu(){
 
 void read_button_placement(){
   PinStatus button = digitalRead(button_pin);
-  if (button == HIGH){
+  if (button == LOW){
     button_pressed = false;
   }
   else{
@@ -298,7 +298,7 @@ void render_connecting(){
 void read_button(){
   PinStatus button = digitalRead(button_pin);
   if (!your_turn){return;}
-  if (button == HIGH){
+  if (button == LOW){
     button_pressed = false;
   }
   else{
@@ -460,18 +460,18 @@ void read_joy_placement(){
   int pos_x = analogRead(joy_x);
   int pos_y = analogRead(joy_y);
   if (pos_x <300){
-    process_joy_input_placement(Left);
-  }
-  else if(pos_x > 700){
     process_joy_input_placement(Right);
   }
-  if (pos_y > 700 && pos_y <900){
-    process_joy_input_placement(Down);
+  else if(pos_x > 700){
+    process_joy_input_placement(Left);
   }
-  else if(pos_y <300){
+  if (pos_y > 700){
     process_joy_input_placement(Up);
   }
-  else if(pos_y > 900){
+  else if(pos_y <300){
+    process_joy_input_placement(Down);
+  }
+  else if(digitalRead(2) == HIGH){
     turn_ship_placement();
   }
 }
@@ -576,18 +576,18 @@ void readJoy(){
   int pos_x = analogRead(joy_x);
   int pos_y = analogRead(joy_y);
   if (pos_x <300){
-    processJoyInput(Left);
-  }
-  else if(pos_x > 700){
     processJoyInput(Right);
   }
-  if (pos_y > 700 && pos_y <900){
-    processJoyInput(Down);
+  else if(pos_x > 700){
+    processJoyInput(Left);
   }
-  else if(pos_y <300){
+  if (pos_y > 700){
     processJoyInput(Up);
   }
-  else if(pos_y > 900){
+  else if(pos_y <300){
+    processJoyInput(Down);
+  }
+  else if(digitalRead(2) == HIGH){
     Serial.println("Click");
   }
 }
