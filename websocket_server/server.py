@@ -132,6 +132,11 @@ async def parse_message(websocket,message):
                     await check_victory_conditions()
                     if result == 3:
                         await change_turns()
+        case "BOATS":
+            for player in players:
+                if player.id != split[4]:
+                    await player.websocket.send(f"ENEMYBOATS:{split[1]}:{split[2]}:{split[3]}")
+
         case _:
             await websocket.send("Unknown command")
 
