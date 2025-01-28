@@ -2,6 +2,8 @@
 
 ## Description
 A classic game of Battleships designed to be played by two people using two Arduino RP2040 devices and a central server. This project implements the traditional Battleships game in a modern, electronic format using Arduino RP2040 microcontrollers. Players can enjoy the classic naval combat strategy game with a digital twist, making it more interactive and engaging.
+![Active](https://github.com/user-attachments/assets/6845d7ac-8a60-4d00-8505-713b73987522)
+
 
 ## Table of Contents
 - [Features](#features)
@@ -27,9 +29,29 @@ A classic game of Battleships designed to be played by two people using two Ardu
 - Network connectivity between devices
 - Required Arduino libraries (list to be added)
 - Central server setup capability
+![oled_tft](https://github.com/user-attachments/assets/e3625b1c-932b-4689-9ef6-08d86e5a3450)
+
 
 ## Hardware Setup
-(Hardware setup instructions and wiring diagrams to be added)
+### SPI Screen
+- VCC -> 5V
+- GND -> GND
+- CLK -> D13
+- MISO -> D12
+- MOSI -> D11
+- CS -> D10
+- DC -> D9
+### Joystick
+- VCC -> 3.3V
+- GND -> GND
+- X -> A1
+- Y -> A0
+### Button
+- VCC -> 3.3V
+- GND -> GND
+- BTN -> D3
+
+![wixed_wiring](https://github.com/user-attachments/assets/48ae0d1c-2365-454c-a08d-888a856e2862)
 
 ## Installation
 
@@ -85,7 +107,7 @@ The server implements the following message protocols:
 - **GRID**: `GRID:grid_data:player_id`
   - Sends the player's ship placement grid
 - **BOATS**: `BOATS:data1:data2:data3:player_id`
-  - Communicates boat placement information
+  - Communicates boat destruction status
 
 #### Gameplay Commands
 - **ATTACK**: `ATTACK:player_id:x:y`
